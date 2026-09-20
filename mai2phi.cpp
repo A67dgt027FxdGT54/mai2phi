@@ -181,10 +181,11 @@ void decodeSimai(const string& chart){
 	for(int i=0;i<chart.length();i++){
 			 if(chart[i] == '&'){
 			decodeFileHeader(chart,i,[&](int newDiff){
+				maimaiCharts[curDiff].bpmlist.bpms.push_back({bpmStart, curTime, curBpm});
 				curDiff = newDiff;
 				isFirstBpm = true;
 				curBpm = 120;
-				commaLen = 4;
+				commaLen = 1;
 				bpmStart = 0;
 				curTime = 0;
 				lastNote = -1;
@@ -204,7 +205,7 @@ void decodeSimai(const string& chart){
 					to_float(getValue(chart, i, '}')) / 60.0f * curBpm
 				);
 			else
-				commaLen = phifrac(int(to_float(getValue(chart, i, '}'))));
+				commaLen = phifrac(4.0 / (to_float(getValue(chart, i, '}'))));
 		}
 		else if('1' <= chart[i] && chart[i] <= '8'){
 			slide_seg_t slideSeg;
@@ -247,67 +248,66 @@ void decodeSimai(const string& chart){
 				else format += timeLen[j];
 			}
 			timeLen += "]"; // END
-			int j=0;
+			int j=-1;
 			if(format == "d:d"){
 				phifrac noteLen, times;
 				noteLen = 4.0f / to_float(getValue(timeLen, j, ':')); // beats
-				j++; // skip ':'
 				times = to_float(getValue(timeLen, j, ']'));
 				maimaiCharts[curDiff].notes[lastNote].end = maimaiCharts[curDiff].notes[lastNote].start + noteLen * times;
 			}
 			else if(format == "d"){
 				phifrac noteLen;
 				noteLen = 4.0f / to_float(getValue(timeLen, j, ']')); // beats
-				maimaiCharts[curDiff].notes[lastNote].end = maimaiCharts[curDiff].notes[lastNote].start + NoteLen;
+				maimaiCharts[curDiff].notes[lastNote].end = maimaiCharts[curDiff].notes[lastNote].start + noteLen;
 			}
 			else if(format == "#d:d"){
-				float seconds, times;
 				j++; // skip '#'
+				float seconds, times;
 				seconds = to_float(getValue(timeLen, j, ':'));
-				j++; // skip ':'
 				times = to_float(getValue(timeLen, j, ']'));
-				phifrac beats = curBPM * 60.0f * (seconds * times);
+				phifrac beats = curBpm / 60.0f * (seconds * times);
 				maimaiCharts[curDiff].notes[lastNote].end = maimaiCharts[curDiff].notes[lastNote].start + beats;
 			}
 			else if(format == "#d"){
-				float seconds;
 				j++; // skip '#'
+				float seconds;
 				seconds = to_float(getValue(timeLen, j, ']'));
-				phifrac beats = curBPM / 60.0f * seconds;
+				phifrac beats = curBpm / 60.0f * seconds;
 				maimaiCharts[curDiff].notes[lastNote].end = maimaiCharts[curDiff].notes[lastNote].start + beats;
 			}
 			else if(format == "d#d:d"){
 				float bpm, noteLen, times;
 				bpm = to_float(getValue(timeLen, j, '#'));
-				j++; // skip '#'
 				noteLen = 4.0f / to_float(getValue(timeLen, j, ':')); // beats
-				j++; // skip ':'
 				times = to_float(getValue(timeLen, j, ']'));
-				float seconds = noteLen / (bpm * 60.0f) * times;
-				phifrac beats = curBPM / 60.0f * seconds;
+				float seconds = noteLen * 60.0f / bpm * times;
+				phifrac beats = curBpm / 60.0f * seconds;
 				maimaiCharts[curDiff].notes[lastNote].end = maimaiCharts[curDiff].notes[lastNote].start + beats;
 			}
 			else if(format == "d#d"){
 				float bpm, noteLen;
 				bpm = to_float(getValue(timeLen, j, '#'));
-				j++; // skip '#'
 				noteLen = 4.0f / to_float(getValue(timeLen, j, ']')); // beats
-				float seconds = noteLen / (bpm * 60.0f);
-				phifrac beats = curBPM / 60.0f * seconds;
+				float seconds = noteLen * 60.0f / bpm;
+				phifrac beats = curBpm / 60.0f * seconds;
 				maimaiCharts[curDiff].notes[lastNote].end = maimaiCharts[curDiff].notes[lastNote].start + beats;
 			}
 			else if(format == "d##d"){
 				float slideDeltaSeconds, totalSeconds;
 				
 				slideDeltaSeconds = to_float(getValue(timeLen, j, '#'));
-				j += 2; // skip '##'
+				j += 1; // skip '##'
 				totalSeconds = to_float(getValue(timeLen, j, ']'));
 				
 				maimaiCharts[curDiff].notes[lastNote].slideDelta = curBpm / 60.0f * slideDeltaSeconds;
+				
+				phifrac totalBeats = curBpm / 60.0f * totalSeconds;
+				maimaiCharts[curDiff].notes[lastNote].end = maimaiCharts[curDiff].notes[lastNote].start + totalBeats;
 			}
 		}
 		else if(chart[i] == ','){
 			curTime = curTime + commaLen;
+			lastNote = -1;
 		}
 	}
 	maimaiCharts[curDiff].bpmlist.bpms.push_back({bpmStart, curTime, curBpm});
@@ -335,7 +335,7 @@ int main(){
 			<< "\nComposer: " << metadata.artist
 			<< "\nCharter: "<< metadata.maimaiCharts[targetDiff].charter;
 	
-	for(auto g:maimaiCharts[targetDiff].bpmlist.bpms){
-		cout << g.bpm << "\n";
-	}
+//	for(maimai_note_t g : maimaiCharts[targetDiff].notes ){
+//		cout << g.
+//	}
 }
