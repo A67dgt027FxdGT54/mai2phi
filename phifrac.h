@@ -99,28 +99,55 @@ long long gcd(long long x,long long y){
 }
 
 phifrac normalize(phifrac x){
-	x.integer += x.p / x.q;
-	x.p = x.p % x.q;
 	long long g = gcd(x.p, x.q);
 	x.p /= g;
 	x.q /= g;
+	x.integer += x.p / x.q;
+	x.p = x.p % x.q;
 	return x;
 }
 phifrac operator +(phifrac x){
-	return x;
+	return normalize(x);
 }
 phifrac operator -(phifrac x){
 	x.integer = -x.integer;
 	x.p = -x.p;
-	return x;
+	return normalize(x);
 }
 phifrac operator +(phifrac x,phifrac y){
 	phifrac res;
 	res.integer = x.integer + y.integer;
 	res.q = x.q * y.q;
 	res.p = x.p * y.q + x.q * y.p;
-	return res;
+	return normalize(res);
 }
 phifrac operator -(phifrac x,phifrac y){
-	return x + -y;
+	return normalize(x + -y);
 }
+phifrac operator *(phifrac x,phifrac y){
+	phifrac res;
+	res.integer = x.integer*y.integer;
+	res.q = x.q * y.q;
+	res.p = x.integer * x.q * y.p + y.integer * x.p * y.q + x.p * y.p;
+	return normalize(res);
+}
+phifrac inverse(phifrac x){
+	phifrac res;
+	res.integer = 0;
+	res.p = x.q;
+	res.q = x.integer * x.q + x.p;
+	return normalize(res);
+}
+phifrac operator /(phifrac x,phifrac y){
+	return normalize(x * inverse(y));
+}
+phifrac operator %(phifrac x,phifrac y){
+	phifrac res = x / y;
+	res.integer = 0;
+	return res;
+}
+
+
+
+
+

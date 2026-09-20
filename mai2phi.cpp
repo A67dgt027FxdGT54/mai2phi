@@ -40,7 +40,7 @@ struct chart_metadata_t{
 struct metadata_t{
 	string songName = "UK";
 	string artist = "UK";
-	chart_metadata_t charts[7] = {
+	chart_metadata_t maimaiCharts[7] = {
 		{"Default", "0", "Unknown", 0},
 		{"Easy", "1", "Unknown", 0},
 		{"Basic", "3", "Unknown", 0},
@@ -66,17 +66,17 @@ struct slide_seg_t{
 	check_area_t start, end;
 	string type = "-"; 
 };
-struct note_t{
+struct maimai_note_t{
 	int type = 0; // 0 - tap & hold, 1 - touch & touch hold, 2 - slide
-	phifrac start, end;
+	phifrac start, end, slideDelta = 1;
 	bool isHeadBreak=0, isSegsBreak=0, isFlash=0, isEx=0, isHold=0; 
 	vector<slide_seg_t> segs;
 };
 
-struct chart_data_t{
+struct maimai_chart_data_t{
 	bpmlist_t bpmlist;
-	vector<note_t> notes;
-}charts[7];
+	vector<maimai_note_t> notes;
+}maimaiCharts[7];
 
 string getValue(const string& chart,int& i,char end){
 	string value;
@@ -116,57 +116,65 @@ void decodeFileHeader(const string& chart,int& i, function<void(int)> changeDiff
 	}
 	     if(argu == "title") 	metadata.songName = getFileHeaderValue(chart,i);
 	else if(argu == "artist")	metadata.artist = getFileHeaderValue(chart,i);
-	else if(argu == "first_1")	metadata.charts[1].msOffset = (int)(1000.0f * to_float(getFileHeaderValue(chart,i))); 
-	else if(argu == "first_2")	metadata.charts[2].msOffset = (int)(1000.0f * to_float(getFileHeaderValue(chart,i))); 
-	else if(argu == "first_3")	metadata.charts[3].msOffset = (int)(1000.0f * to_float(getFileHeaderValue(chart,i))); 
-	else if(argu == "first_4")	metadata.charts[4].msOffset = (int)(1000.0f * to_float(getFileHeaderValue(chart,i))); 
-	else if(argu == "first_5")	metadata.charts[5].msOffset = (int)(1000.0f * to_float(getFileHeaderValue(chart,i))); 
-	else if(argu == "first_6")	metadata.charts[6].msOffset = (int)(1000.0f * to_float(getFileHeaderValue(chart,i))); 
-	else if(argu == "first")	metadata.charts[1].msOffset = (int)(1000.0f * to_float(getFileHeaderValue(chart,i))),
-								metadata.charts[2].msOffset = metadata.charts[1].msOffset,
-								metadata.charts[3].msOffset = metadata.charts[1].msOffset,
-								metadata.charts[4].msOffset = metadata.charts[1].msOffset,
-								metadata.charts[5].msOffset = metadata.charts[1].msOffset,
-								metadata.charts[6].msOffset = metadata.charts[1].msOffset;
-	else if(argu == "lv_1")		metadata.charts[1].lv = getFileHeaderValue(chart,i); 
-	else if(argu == "lv_2")		metadata.charts[2].lv = getFileHeaderValue(chart,i); 
-	else if(argu == "lv_3")		metadata.charts[3].lv = getFileHeaderValue(chart,i); 
-	else if(argu == "lv_4")		metadata.charts[4].lv = getFileHeaderValue(chart,i); 
-	else if(argu == "lv_5")		metadata.charts[5].lv = getFileHeaderValue(chart,i); 
-	else if(argu == "lv_6")		metadata.charts[6].lv = getFileHeaderValue(chart,i); 
-	else if(argu == "lv")		metadata.charts[1].lv = getFileHeaderValue(chart,i),
-								metadata.charts[2].lv = metadata.charts[1].lv,
-								metadata.charts[3].lv = metadata.charts[1].lv,
-								metadata.charts[4].lv = metadata.charts[1].lv,
-								metadata.charts[5].lv = metadata.charts[1].lv,
-								metadata.charts[6].lv = metadata.charts[1].lv;
-	else if(argu == "des_1")	metadata.charts[1].charter = getFileHeaderValue(chart,i); 
-	else if(argu == "des_2")	metadata.charts[2].charter = getFileHeaderValue(chart,i); 
-	else if(argu == "des_3")	metadata.charts[3].charter = getFileHeaderValue(chart,i); 
-	else if(argu == "des_4")	metadata.charts[4].charter = getFileHeaderValue(chart,i); 
-	else if(argu == "des_5")	metadata.charts[5].charter = getFileHeaderValue(chart,i); 
-	else if(argu == "des_6")	metadata.charts[6].charter = getFileHeaderValue(chart,i); 
-	else if(argu == "des")		metadata.charts[1].charter = getFileHeaderValue(chart,i),
-								metadata.charts[2].charter = metadata.charts[1].charter,
-								metadata.charts[3].charter = metadata.charts[1].charter,
-								metadata.charts[4].charter = metadata.charts[1].charter,
-								metadata.charts[5].charter = metadata.charts[1].charter,
-								metadata.charts[6].charter = metadata.charts[1].charter;
-	else if(argu == "inote_1")	metadata.charts[1].is_valid = 1, changeDiffCallback(1);
-	else if(argu == "inote_2")	metadata.charts[2].is_valid = 1, changeDiffCallback(2);
-	else if(argu == "inote_3")	metadata.charts[3].is_valid = 1, changeDiffCallback(3);
-	else if(argu == "inote_4")	metadata.charts[4].is_valid = 1, changeDiffCallback(4);
-	else if(argu == "inote_5")	metadata.charts[5].is_valid = 1, changeDiffCallback(5);
-	else if(argu == "inote_6")	metadata.charts[6].is_valid = 1, changeDiffCallback(6);
+	else if(argu == "first_1")	metadata.maimaiCharts[1].msOffset = (int)(1000.0f * to_float(getFileHeaderValue(chart,i))); 
+	else if(argu == "first_2")	metadata.maimaiCharts[2].msOffset = (int)(1000.0f * to_float(getFileHeaderValue(chart,i))); 
+	else if(argu == "first_3")	metadata.maimaiCharts[3].msOffset = (int)(1000.0f * to_float(getFileHeaderValue(chart,i))); 
+	else if(argu == "first_4")	metadata.maimaiCharts[4].msOffset = (int)(1000.0f * to_float(getFileHeaderValue(chart,i))); 
+	else if(argu == "first_5")	metadata.maimaiCharts[5].msOffset = (int)(1000.0f * to_float(getFileHeaderValue(chart,i))); 
+	else if(argu == "first_6")	metadata.maimaiCharts[6].msOffset = (int)(1000.0f * to_float(getFileHeaderValue(chart,i))); 
+	else if(argu == "first")	metadata.maimaiCharts[1].msOffset = (int)(1000.0f * to_float(getFileHeaderValue(chart,i))),
+								metadata.maimaiCharts[2].msOffset = metadata.maimaiCharts[1].msOffset,
+								metadata.maimaiCharts[3].msOffset = metadata.maimaiCharts[1].msOffset,
+								metadata.maimaiCharts[4].msOffset = metadata.maimaiCharts[1].msOffset,
+								metadata.maimaiCharts[5].msOffset = metadata.maimaiCharts[1].msOffset,
+								metadata.maimaiCharts[6].msOffset = metadata.maimaiCharts[1].msOffset;
+	else if(argu == "lv_1")		metadata.maimaiCharts[1].lv = getFileHeaderValue(chart,i); 
+	else if(argu == "lv_2")		metadata.maimaiCharts[2].lv = getFileHeaderValue(chart,i); 
+	else if(argu == "lv_3")		metadata.maimaiCharts[3].lv = getFileHeaderValue(chart,i); 
+	else if(argu == "lv_4")		metadata.maimaiCharts[4].lv = getFileHeaderValue(chart,i); 
+	else if(argu == "lv_5")		metadata.maimaiCharts[5].lv = getFileHeaderValue(chart,i); 
+	else if(argu == "lv_6")		metadata.maimaiCharts[6].lv = getFileHeaderValue(chart,i); 
+	else if(argu == "lv")		metadata.maimaiCharts[1].lv = getFileHeaderValue(chart,i),
+								metadata.maimaiCharts[2].lv = metadata.maimaiCharts[1].lv,
+								metadata.maimaiCharts[3].lv = metadata.maimaiCharts[1].lv,
+								metadata.maimaiCharts[4].lv = metadata.maimaiCharts[1].lv,
+								metadata.maimaiCharts[5].lv = metadata.maimaiCharts[1].lv,
+								metadata.maimaiCharts[6].lv = metadata.maimaiCharts[1].lv;
+	else if(argu == "des_1")	metadata.maimaiCharts[1].charter = getFileHeaderValue(chart,i); 
+	else if(argu == "des_2")	metadata.maimaiCharts[2].charter = getFileHeaderValue(chart,i); 
+	else if(argu == "des_3")	metadata.maimaiCharts[3].charter = getFileHeaderValue(chart,i); 
+	else if(argu == "des_4")	metadata.maimaiCharts[4].charter = getFileHeaderValue(chart,i); 
+	else if(argu == "des_5")	metadata.maimaiCharts[5].charter = getFileHeaderValue(chart,i); 
+	else if(argu == "des_6")	metadata.maimaiCharts[6].charter = getFileHeaderValue(chart,i); 
+	else if(argu == "des")		metadata.maimaiCharts[1].charter = getFileHeaderValue(chart,i),
+								metadata.maimaiCharts[2].charter = metadata.maimaiCharts[1].charter,
+								metadata.maimaiCharts[3].charter = metadata.maimaiCharts[1].charter,
+								metadata.maimaiCharts[4].charter = metadata.maimaiCharts[1].charter,
+								metadata.maimaiCharts[5].charter = metadata.maimaiCharts[1].charter,
+								metadata.maimaiCharts[6].charter = metadata.maimaiCharts[1].charter;
+	else if(argu == "inote_1")	metadata.maimaiCharts[1].is_valid = 1, changeDiffCallback(1);
+	else if(argu == "inote_2")	metadata.maimaiCharts[2].is_valid = 1, changeDiffCallback(2);
+	else if(argu == "inote_3")	metadata.maimaiCharts[3].is_valid = 1, changeDiffCallback(3);
+	else if(argu == "inote_4")	metadata.maimaiCharts[4].is_valid = 1, changeDiffCallback(4);
+	else if(argu == "inote_5")	metadata.maimaiCharts[5].is_valid = 1, changeDiffCallback(5);
+	else if(argu == "inote_6")	metadata.maimaiCharts[6].is_valid = 1, changeDiffCallback(6);
 	else getFileHeaderValue(chart,i);
+}
+
+bool isFloatDigit(char c){
+	return (
+		'0' <= c && c <= '9' ||
+		c == '.' ||
+		c == '-'
+	);
 }
 
 void decodeSimai(const string& chart){
 	int curDiff = 0;
-	metadata.charts[0].is_valid = 1;
+	metadata.maimaiCharts[0].is_valid = 1;
 	bool isFirstBpm = true;
 	float curBpm = 120;
-	phifrac commaLen(4); // i.e. quarter
+	phifrac commaLen(1); // i.e. a beat(a quarter)
 	phifrac bpmStart, curTime;
 	int lastNote = -1;
 	
@@ -184,7 +192,7 @@ void decodeSimai(const string& chart){
 		}
 		else if(chart[i] == '('){
 			if(!isFirstBpm)
-				charts[curDiff].bpmlist.bpms.push_back({bpmStart, curTime, curBpm});
+				maimaiCharts[curDiff].bpmlist.bpms.push_back({bpmStart, curTime, curBpm});
 			else isFirstBpm = 0;
 			bpmStart = curTime;
 			curBpm = to_float(getValue(chart, i, ')'));
@@ -202,36 +210,107 @@ void decodeSimai(const string& chart){
 			slide_seg_t slideSeg;
 			slideSeg.start.alpha = 'K';
 			slideSeg.start.id = chart[i] - '0';
-			note_t note;
+			maimai_note_t note;
 			note.type = 0;
 			note.start = curTime;
 			note.end = curTime;
 			note.segs.push_back(slideSeg);
-			charts[curDiff].notes.push_back(note);
-			lastNote = charts[curDiff].notes.size() - 1;
+			maimaiCharts[curDiff].notes.push_back(note);
+			lastNote = maimaiCharts[curDiff].notes.size() - 1;
 		}
 		else if(chart[i] == 'b'){
-			if(charts[curDiff].notes[lastNote].type != 2){
-				charts[curDiff].notes[lastNote].isHeadBreak = 1;
+			if(lastNote == -1) continue;
+			if(maimaiCharts[curDiff].notes[lastNote].type != 2){
+				maimaiCharts[curDiff].notes[lastNote].isHeadBreak = 1;
 			}
 			else{
-				charts[curDiff].notes[lastNote].isSegsBreak = 1;
+				maimaiCharts[curDiff].notes[lastNote].isSegsBreak = 1;
 			}
 		}
 		else if(chart[i] == 'x'){
-			charts[curDiff].notes[lastNote].isEx = 1;
+			if(lastNote == -1) continue;
+			maimaiCharts[curDiff].notes[lastNote].isEx = 1;
 		}
 		else if(chart[i] == 'h'){
-			charts[curDiff].notes[lastNote].isHold = 1;
+			if(lastNote == -1) continue;
+			maimaiCharts[curDiff].notes[lastNote].isHold = 1;
 		}
 		else if(chart[i] == '['){
-			;
+			if(lastNote == -1) continue;
+			string timeLen = getValue(chart, i, ']');
+			string format = "";
+			for(int j=0;j<timeLen.length();j++){
+				if(isFloatDigit(timeLen[j])){
+					if(j==0) format += 'd';
+					else if(!isFloatDigit(timeLen[j-1])) format += 'd';
+				} 
+				else format += timeLen[j];
+			}
+			timeLen += "]"; // END
+			int j=0;
+			if(format == "d:d"){
+				phifrac noteLen, times;
+				noteLen = 4.0f / to_float(getValue(timeLen, j, ':')); // beats
+				j++; // skip ':'
+				times = to_float(getValue(timeLen, j, ']'));
+				maimaiCharts[curDiff].notes[lastNote].end = maimaiCharts[curDiff].notes[lastNote].start + noteLen * times;
+			}
+			else if(format == "d"){
+				phifrac noteLen;
+				noteLen = 4.0f / to_float(getValue(timeLen, j, ']')); // beats
+				maimaiCharts[curDiff].notes[lastNote].end = maimaiCharts[curDiff].notes[lastNote].start + NoteLen;
+			}
+			else if(format == "#d:d"){
+				float seconds, times;
+				j++; // skip '#'
+				seconds = to_float(getValue(timeLen, j, ':'));
+				j++; // skip ':'
+				times = to_float(getValue(timeLen, j, ']'));
+				phifrac beats = curBPM * 60.0f * (seconds * times);
+				maimaiCharts[curDiff].notes[lastNote].end = maimaiCharts[curDiff].notes[lastNote].start + beats;
+			}
+			else if(format == "#d"){
+				float seconds;
+				j++; // skip '#'
+				seconds = to_float(getValue(timeLen, j, ']'));
+				phifrac beats = curBPM / 60.0f * seconds;
+				maimaiCharts[curDiff].notes[lastNote].end = maimaiCharts[curDiff].notes[lastNote].start + beats;
+			}
+			else if(format == "d#d:d"){
+				float bpm, noteLen, times;
+				bpm = to_float(getValue(timeLen, j, '#'));
+				j++; // skip '#'
+				noteLen = 4.0f / to_float(getValue(timeLen, j, ':')); // beats
+				j++; // skip ':'
+				times = to_float(getValue(timeLen, j, ']'));
+				float seconds = noteLen / (bpm * 60.0f) * times;
+				phifrac beats = curBPM / 60.0f * seconds;
+				maimaiCharts[curDiff].notes[lastNote].end = maimaiCharts[curDiff].notes[lastNote].start + beats;
+			}
+			else if(format == "d#d"){
+				float bpm, noteLen;
+				bpm = to_float(getValue(timeLen, j, '#'));
+				j++; // skip '#'
+				noteLen = 4.0f / to_float(getValue(timeLen, j, ']')); // beats
+				float seconds = noteLen / (bpm * 60.0f);
+				phifrac beats = curBPM / 60.0f * seconds;
+				maimaiCharts[curDiff].notes[lastNote].end = maimaiCharts[curDiff].notes[lastNote].start + beats;
+			}
+			else if(format == "d##d"){
+				float slideDeltaSeconds, totalSeconds;
+				
+				slideDeltaSeconds = to_float(getValue(timeLen, j, '#'));
+				j += 2; // skip '##'
+				totalSeconds = to_float(getValue(timeLen, j, ']'));
+				
+				maimaiCharts[curDiff].notes[lastNote].slideDelta = curBpm / 60.0f * slideDeltaSeconds;
+			}
 		}
 		else if(chart[i] == ','){
-			;
+			curTime = curTime + commaLen;
 		}
 	}
-	charts[curDiff].bpmlist.bpms.push_back({bpmStart, curTime, curBpm});
+	maimaiCharts[curDiff].bpmlist.bpms.push_back({bpmStart, curTime, curBpm});
 }
 
 int main(){
@@ -246,17 +325,17 @@ int main(){
 	
 	cout << "文件解析成功。检测到以下难度的谱面。请输入要转换的谱面的编号：\n";
 	for(int i=0; i<=6; i++)
-		if(metadata.charts[i].is_valid) cout << i << ". " << metadata.charts[i].diff << "\n";
+		if(metadata.maimaiCharts[i].is_valid) cout << i << ". " << metadata.maimaiCharts[i].diff << "\n";
 	int targetDiff;
 	cin >> targetDiff;
 	
 	infoOut << "#\nName: " << metadata.songName 
 			<< "\nPath: \nSong: \nPicture: \nChart: \nLevel: " 
-				<< metadata.charts[targetDiff].diff <<" Lv." << metadata.charts[targetDiff].lv
+				<< metadata.maimaiCharts[targetDiff].diff <<" Lv." << metadata.maimaiCharts[targetDiff].lv
 			<< "\nComposer: " << metadata.artist
-			<< "\nCharter: "<< metadata.charts[targetDiff].charter;
+			<< "\nCharter: "<< metadata.maimaiCharts[targetDiff].charter;
 	
-	for(auto g:charts[targetDiff].bpmlist.bpms){
+	for(auto g:maimaiCharts[targetDiff].bpmlist.bpms){
 		cout << g.bpm << "\n";
 	}
 }
