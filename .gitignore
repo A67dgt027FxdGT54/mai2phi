@@ -1,0 +1,9 @@
+output/
+
+*.txt
+
+frac.h
+
+*.exe
+
+test*.cpp
