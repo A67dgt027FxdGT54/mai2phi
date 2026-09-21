@@ -41,7 +41,7 @@ struct metadata_t{
 	string songName = "UK";
 	string artist = "UK";
 	chart_metadata_t maimaiCharts[7] = {
-		{"Default", "0", "Unknown", 0},
+		{"Default", "0", "Unknown", 0}, // fallback when there isn't '&'
 		{"Easy", "1", "Unknown", 0},
 		{"Basic", "3", "Unknown", 0},
 		{"Advanced", "7", "Unknown", 0},
@@ -69,7 +69,7 @@ struct slide_seg_t{
 struct maimai_note_t{
 	int type = 0; // 0 - tap & hold, 1 - touch & touch hold, 2 - slide
 	phifrac start, end, slideDelta = 1;
-	bool isHeadBreak=0, isSegsBreak=0, isFlash=0, isEx=0, isHold=0; 
+	bool isHeadBreak=0, isSegsBreak=0, isFirework=0, isEx=0, isHold=0; 
 	vector<slide_seg_t> segs;
 };
 
@@ -275,8 +275,7 @@ void decodeSimai(const string& chart){
 			maimaiCharts[curDiff].notes.push_back(note);
 			lastNote = maimaiCharts[curDiff].notes.size() - 1;
 		}
-		else if(chart[i] == 'b'){
-			if(lastNote == -1) continue;
+		else if(chart[i] == 'b' && lastNote != -1){ // break
 			if(maimaiCharts[curDiff].notes[lastNote].type != 2){
 				maimaiCharts[curDiff].notes[lastNote].isHeadBreak = 1;
 			}
@@ -287,6 +286,10 @@ void decodeSimai(const string& chart){
 		else if(chart[i] == 'x'){
 			if(lastNote == -1) continue;
 			maimaiCharts[curDiff].notes[lastNote].isEx = 1;
+		}
+		else if(chart[i] == 'f'){
+			if(lastNote == -1) continue;
+			maimaiCharts[curDiff].notes[lastNote].isFirework = 1;
 		}
 		else if(chart[i] == 'h'){
 			if(lastNote == -1) continue;
@@ -369,22 +372,77 @@ void decodeSimai(const string& chart){
 		}
 		else if(chart[i] == '-' || chart[i] == 'v' || chart[i] == 's' || chart[i] == 'z' || chart[i] == 'w' ||
 			chart[i] == 'p' && chart[i+1] != 'p' || chart[i] == 'q' && chart[i+1] != 'q'){
+			if(lastNote == -1 || i+1 >= chart.length()) continue;
 			addSeg(curDiff, lastNote, chart[i+1] - '0', string(chart[i], 1));
 			i+=1;
 		}
-		else if(chart[i] == 'p' && chart[i+1] == 'p' || chart[i] == 'q' && chart[i+1] == 'q'){
+		else if(i+1 < chart.length() && (chart[i] == 'p' && chart[i+1] == 'p' || chart[i] == 'q' && chart[i+1] == 'q')){
+			if(lastNote == -1 || i+2 >= chart.length()) continue;
 			addSeg(curDiff, lastNote, chart[i+2] - '0', string(chart[i], 2));
 			i+=2;
 		}
 		else if(chart[i] == 'V'){
+			if(lastNote == -1 || i+2 >= chart.length()) continue;
 			addSeg(curDiff, lastNote, chart[i+1] - '0', "-");
 			addSeg(curDiff, lastNote, chart[i+2] - '0', "-");
 			i+=2;
 		}
 		else if(chart[i] == '<' || chart[i] == '>' || chart[i] == '^'){
+			if(lastNote == -1 || i+1 >= chart.length()) continue;
 			int lastSeg = maimaiCharts[curDiff].notes[lastNote].segs.size()-1;
 			int start = maimaiCharts[curDiff].notes[lastNote].segs[lastSeg].start.id;
 			int end = chart[i+1] - '0';
+			if(chart[i] == '<'){
+				addSeg(curDiff, lastNote, end, string(" LLRRRRLL"[start], 1));
+			}
+			else if(chart[i] == '>'){
+				addSeg(curDiff, lastNote, end, string(" RRLLLLRR"[start], 1));
+			}
+			else if(chart[i] == '^'){
+				int L = (start + 8 - end) % 8;
+				int R = 8 - L;
+				addSeg(curDiff, lastNote, end, string("LR"[int(L > R)], 1));
+			}
+		}
+		else if(chart[i] == 'A' || chart[i] == 'B' || chart[i] == 'D' || chart[i] == 'E'){
+			if(i+1 >= chart.length()) continue;
+			slide_seg_t slideSeg;
+			slideSeg.start.alpha = chart[i];
+			slideSeg.start.id = chart[i+1] - '0';
+			maimai_note_t note;
+			note.type = 1;
+			note.start = curTime;
+			note.end = curTime;
+			note.segs.push_back(slideSeg);
+			maimaiCharts[curDiff].notes.push_back(note);
+			lastNote = maimaiCharts[curDiff].notes.size() - 1;
+			i++;
+		}
+		else if(chart[i] == 'a' || (chart[i] == 'b' && lastNote == -1/*isn't break*/) || chart[i] == 'd' || chart[i] == 'e'){
+			if(i+1 >= chart.length()) continue;
+			slide_seg_t slideSeg;
+			slideSeg.start.alpha = chart[i] - 32;
+			slideSeg.start.id = chart[i+1] - '0';
+			maimai_note_t note;
+			note.type = 1;
+			note.start = curTime;
+			note.end = curTime;
+			note.segs.push_back(slideSeg);
+			maimaiCharts[curDiff].notes.push_back(note);
+			lastNote = maimaiCharts[curDiff].notes.size() - 1;
+			i++;
+		}
+		else if(chart[i] == 'C' || chart[i] == 'c'){
+			slide_seg_t slideSeg;
+			slideSeg.start.alpha = 'C';
+			slideSeg.start.id = 1;
+			maimai_note_t note;
+			note.type = 1;
+			note.start = curTime;
+			note.end = curTime;
+			note.segs.push_back(slideSeg);
+			maimaiCharts[curDiff].notes.push_back(note);
+			lastNote = maimaiCharts[curDiff].notes.size() - 1;
 		}
 	}
 	maimaiCharts[curDiff].bpmlist.bpms.push_back({bpmStart, curTime, curBpm});
