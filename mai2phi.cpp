@@ -64,7 +64,7 @@ struct check_area_t{ // K* for key; else for screen
 };
 struct slide_seg_t{
 	check_area_t start, end;
-	string type = "-"; 
+	string type = "N"; // use 'L' 'R' instead of '<' '>' '^'.
 };
 struct maimai_note_t{
 	int type = 0; // 0 - tap & hold, 1 - touch & touch hold, 2 - slide
@@ -77,6 +77,7 @@ struct maimai_chart_data_t{
 	bpmlist_t bpmlist;
 	vector<maimai_note_t> notes;
 }maimaiCharts[7];
+
 
 string getValue(const string& chart,int& i,char end){
 	string value;
@@ -169,12 +170,70 @@ bool isFloatDigit(char c){
 	);
 }
 
+phifrac NoteLenToBeats(float NoteLen){ // o (full note) = 1 NoteLen, = 4 Beats;  quarter note = 4 NoteLen, = 1 beats
+	return 4.0f / NoteLen;
+}
+phifrac secondsToBeats(float bpm, float seconds){
+	return seconds * bpm / 60.0f;
+}
+float beatsToSeconds(float bpm, float beats){
+	return beats * 60.0f / bpm;
+}
+float beatsToSeconds(float bpm, phifrac beats){
+	return (beats.integer + (float)(beats.p) / (float)(beats.q)) * 60 / bpm;
+}
+float NoteLenToSeconds(float bpm, float NoteLen){
+	return beatsToSeconds(bpm, NoteLenToBeats(NoteLen));
+}
+phifrac changeBpmOfBeats(float oldBpm, float newBpm, float beats){
+	return secondsToBeats(newBpm, beatsToSeconds(oldBpm, beats));
+}
+
+phifrac changeBpmOfBeats(float oldBpm, float newBpm, phifrac beats){
+	return secondsToBeats(newBpm, beatsToSeconds(oldBpm, beats));
+}
+phifrac changeBpmOfNoteLen(float oldBpm, float newBpm, float NoteLen){
+	return changeBpmOfBeats(oldBpm, newBpm, NoteLenToBeats(NoteLen));
+}
+struct comma_length_t{
+	bool isSeconds = 0;
+	float seconds = 1.0f;
+	phifrac beats = 1;
+	phifrac to_beats(float bpm){
+		if(isSeconds)
+			return secondsToBeats(bpm, seconds);
+		else
+			return beats;
+	}
+	void reset(){
+		isSeconds = 0;
+		seconds = 1.0f;
+		beats = 1;
+	}
+};
+
+void addSeg(int curDiff, int lastNote, int id, string type){
+	// set type
+	maimaiCharts[curDiff].notes[lastNote].type = 2;
+	
+	// set last seg
+	int lastSeg = maimaiCharts[curDiff].notes[lastNote].segs.size()-1;
+	maimaiCharts[curDiff].notes[lastNote].segs[lastSeg].end.alpha = 'K';
+	maimaiCharts[curDiff].notes[lastNote].segs[lastSeg].end.id = id;
+	maimaiCharts[curDiff].notes[lastNote].segs[lastSeg].type = type;
+	
+	// set new seg
+	slide_seg_t newSeg;
+	newSeg.start = maimaiCharts[curDiff].notes[lastNote].segs[lastSeg].end;
+	maimaiCharts[curDiff].notes[lastNote].segs.push_back(newSeg);
+}
+
 void decodeSimai(const string& chart){
 	int curDiff = 0;
 	metadata.maimaiCharts[0].is_valid = 1;
 	bool isFirstBpm = true;
 	float curBpm = 120;
-	phifrac commaLen(1); // i.e. a beat(a quarter)
+	comma_length_t commaLen;
 	phifrac bpmStart, curTime;
 	int lastNote = -1;
 	
@@ -185,7 +244,7 @@ void decodeSimai(const string& chart){
 				curDiff = newDiff;
 				isFirstBpm = true;
 				curBpm = 120;
-				commaLen = 1;
+				commaLen.reset();
 				bpmStart = 0;
 				curTime = 0;
 				lastNote = -1;
@@ -200,12 +259,9 @@ void decodeSimai(const string& chart){
 		}
 		else if(chart[i] == '{'){
 			if(chart[i+1] == '#')
-				i++,
-				commaLen = phifrac(
-					to_float(getValue(chart, i, '}')) / 60.0f * curBpm
-				);
+				commaLen.isSeconds = 1, i++, commaLen.seconds = to_float(getValue(chart, i, '}'));
 			else
-				commaLen = phifrac(4.0 / (to_float(getValue(chart, i, '}'))));
+				commaLen.isSeconds = 0, commaLen.beats = phifrac(4.0 / (to_float(getValue(chart, i, '}'))));
 		}
 		else if('1' <= chart[i] && chart[i] <= '8'){
 			slide_seg_t slideSeg;
@@ -250,47 +306,46 @@ void decodeSimai(const string& chart){
 			timeLen += "]"; // END
 			int j=-1;
 			if(format == "d:d"){
-				phifrac noteLen, times;
-				noteLen = 4.0f / to_float(getValue(timeLen, j, ':')); // beats
+				float NoteLen;
+				phifrac times;
+				NoteLen = to_float(getValue(timeLen, j, ':')); // beats
 				times = to_float(getValue(timeLen, j, ']'));
-				maimaiCharts[curDiff].notes[lastNote].end = maimaiCharts[curDiff].notes[lastNote].start + noteLen * times;
+				maimaiCharts[curDiff].notes[lastNote].end = maimaiCharts[curDiff].notes[lastNote].start + NoteLenToBeats(NoteLen) * times;
 			}
 			else if(format == "d"){
-				phifrac noteLen;
-				noteLen = 4.0f / to_float(getValue(timeLen, j, ']')); // beats
-				maimaiCharts[curDiff].notes[lastNote].end = maimaiCharts[curDiff].notes[lastNote].start + noteLen;
+				float NoteLen;
+				NoteLen = to_float(getValue(timeLen, j, ']')); // beats
+				maimaiCharts[curDiff].notes[lastNote].end = maimaiCharts[curDiff].notes[lastNote].start + NoteLenToBeats(NoteLen);
 			}
 			else if(format == "#d:d"){
 				j++; // skip '#'
 				float seconds, times;
 				seconds = to_float(getValue(timeLen, j, ':'));
 				times = to_float(getValue(timeLen, j, ']'));
-				phifrac beats = curBpm / 60.0f * (seconds * times);
-				maimaiCharts[curDiff].notes[lastNote].end = maimaiCharts[curDiff].notes[lastNote].start + beats;
+				maimaiCharts[curDiff].notes[lastNote].end = maimaiCharts[curDiff].notes[lastNote].start + secondsToBeats(curBpm, seconds * times);
 			}
 			else if(format == "#d"){
 				j++; // skip '#'
 				float seconds;
 				seconds = to_float(getValue(timeLen, j, ']'));
-				phifrac beats = curBpm / 60.0f * seconds;
-				maimaiCharts[curDiff].notes[lastNote].end = maimaiCharts[curDiff].notes[lastNote].start + beats;
+				maimaiCharts[curDiff].notes[lastNote].end = maimaiCharts[curDiff].notes[lastNote].start + secondsToBeats(curBpm, seconds);
 			}
 			else if(format == "d#d:d"){
-				float bpm, noteLen, times;
+				float bpm, NoteLen, times;
 				bpm = to_float(getValue(timeLen, j, '#'));
-				noteLen = 4.0f / to_float(getValue(timeLen, j, ':')); // beats
+				NoteLen = to_float(getValue(timeLen, j, ':')); 
 				times = to_float(getValue(timeLen, j, ']'));
-				float seconds = noteLen * 60.0f / bpm * times;
-				phifrac beats = curBpm / 60.0f * seconds;
-				maimaiCharts[curDiff].notes[lastNote].end = maimaiCharts[curDiff].notes[lastNote].start + beats;
+				maimaiCharts[curDiff].notes[lastNote].slideDelta = changeBpmOfBeats(bpm, curBpm, 1);
+				maimaiCharts[curDiff].notes[lastNote].end = 
+					maimaiCharts[curDiff].notes[lastNote].start + times * changeBpmOfNoteLen(bpm, curBpm, NoteLen);
 			}
 			else if(format == "d#d"){
-				float bpm, noteLen;
+				float bpm, seconds;
 				bpm = to_float(getValue(timeLen, j, '#'));
-				noteLen = 4.0f / to_float(getValue(timeLen, j, ']')); // beats
-				float seconds = noteLen * 60.0f / bpm;
-				phifrac beats = curBpm / 60.0f * seconds;
-				maimaiCharts[curDiff].notes[lastNote].end = maimaiCharts[curDiff].notes[lastNote].start + beats;
+				seconds = to_float(getValue(timeLen, j, ']')); 
+				maimaiCharts[curDiff].notes[lastNote].slideDelta = changeBpmOfBeats(bpm, curBpm, 1);
+				maimaiCharts[curDiff].notes[lastNote].end = 
+					maimaiCharts[curDiff].notes[lastNote].start + secondsToBeats(curBpm, seconds);
 			}
 			else if(format == "d##d"){
 				float slideDeltaSeconds, totalSeconds;
@@ -299,15 +354,37 @@ void decodeSimai(const string& chart){
 				j += 1; // skip '##'
 				totalSeconds = to_float(getValue(timeLen, j, ']'));
 				
-				maimaiCharts[curDiff].notes[lastNote].slideDelta = curBpm / 60.0f * slideDeltaSeconds;
+				maimaiCharts[curDiff].notes[lastNote].slideDelta = secondsToBeats(curBpm, slideDeltaSeconds);
 				
-				phifrac totalBeats = curBpm / 60.0f * totalSeconds;
-				maimaiCharts[curDiff].notes[lastNote].end = maimaiCharts[curDiff].notes[lastNote].start + totalBeats;
+				maimaiCharts[curDiff].notes[lastNote].end = 
+					maimaiCharts[curDiff].notes[lastNote].start + secondsToBeats(curBpm, totalSeconds);
 			}
 		}
 		else if(chart[i] == ','){
-			curTime = curTime + commaLen;
+			curTime = curTime + commaLen.to_beats(curBpm);
 			lastNote = -1;
+		}
+		else if(chart[i] == '/'){
+			lastNote = -1;
+		}
+		else if(chart[i] == '-' || chart[i] == 'v' || chart[i] == 's' || chart[i] == 'z' || chart[i] == 'w' ||
+			chart[i] == 'p' && chart[i+1] != 'p' || chart[i] == 'q' && chart[i+1] != 'q'){
+			addSeg(curDiff, lastNote, chart[i+1] - '0', string(chart[i], 1));
+			i+=1;
+		}
+		else if(chart[i] == 'p' && chart[i+1] == 'p' || chart[i] == 'q' && chart[i+1] == 'q'){
+			addSeg(curDiff, lastNote, chart[i+2] - '0', string(chart[i], 2));
+			i+=2;
+		}
+		else if(chart[i] == 'V'){
+			addSeg(curDiff, lastNote, chart[i+1] - '0', "-");
+			addSeg(curDiff, lastNote, chart[i+2] - '0', "-");
+			i+=2;
+		}
+		else if(chart[i] == '<' || chart[i] == '>' || chart[i] == '^'){
+			int lastSeg = maimaiCharts[curDiff].notes[lastNote].segs.size()-1;
+			int start = maimaiCharts[curDiff].notes[lastNote].segs[lastSeg].start.id;
+			int end = chart[i+1] - '0';
 		}
 	}
 	maimaiCharts[curDiff].bpmlist.bpms.push_back({bpmStart, curTime, curBpm});
