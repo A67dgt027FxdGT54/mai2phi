@@ -7,3 +7,5 @@ frac.h
 *.exe
 
 test*.cpp
+
+*.log

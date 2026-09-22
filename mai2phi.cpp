@@ -40,6 +40,10 @@ struct chart_metadata_t{
 struct metadata_t{
 	string songName = "UK";
 	string artist = "UK";
+	string path = "placeholder";
+	string song = "track.mp3";
+	string picture = "bg.png";
+	string chart = "chart.json";
 	chart_metadata_t maimaiCharts[7] = {
 		{"Default", "0", "Unknown", 0}, // fallback when there isn't '&'
 		{"Easy", "1", "Unknown", 0},
@@ -69,7 +73,8 @@ struct slide_seg_t{
 struct maimai_note_t{
 	int type = 0; // 0 - tap & hold, 1 - touch & touch hold, 2 - slide
 	phifrac start, end, slideDelta = 1;
-	bool isHeadBreak=0, isSegsBreak=0, isFirework=0, isEx=0, isHold=0; 
+	bool isHeadBreak=0, isSegsBreak=0, isFirework=0, isEx=0, isHold=0;
+	bool doChangeTapToStar=0, doChangeStarToTap=0, doStarRotate=1, isStarHidden/*?*/=0, isStarInstant/*!*/=0; 
 	vector<slide_seg_t> segs;
 };
 
@@ -261,7 +266,7 @@ void decodeSimai(const string& chart){
 			if(chart[i+1] == '#')
 				commaLen.isSeconds = 1, i++, commaLen.seconds = to_float(getValue(chart, i, '}'));
 			else
-				commaLen.isSeconds = 0, commaLen.beats = phifrac(4.0 / (to_float(getValue(chart, i, '}'))));
+				commaLen.isSeconds = 0, commaLen.beats = phifrac(4.0f / (to_float(getValue(chart, i, '}'))));
 		}
 		else if('1' <= chart[i] && chart[i] <= '8'){
 			slide_seg_t slideSeg;
@@ -444,6 +449,23 @@ void decodeSimai(const string& chart){
 			maimaiCharts[curDiff].notes.push_back(note);
 			lastNote = maimaiCharts[curDiff].notes.size() - 1;
 		}
+		else if(chart[i] == '$'){
+			if(lastNote == -1) continue;
+			maimaiCharts[curDiff].notes[lastNote].doChangeTapToStar = 1;
+			maimaiCharts[curDiff].notes[lastNote].doStarRotate = (i+1 < chart.length() && chart[i+1] == '$')?(i++,true):false;
+		}
+		else if(chart[i] == '@'){
+			if(lastNote == -1) continue;
+			maimaiCharts[curDiff].notes[lastNote].doChangeStarToTap = 1;
+		}
+		else if(chart[i] == '?'){
+			if(lastNote == -1) continue;
+			maimaiCharts[curDiff].notes[lastNote].isStarHidden = 1;
+		}
+		else if(chart[i] == '!'){
+			if(lastNote == -1) continue;
+			maimaiCharts[curDiff].notes[lastNote].isStarInstant = 1;
+		}
 	}
 	maimaiCharts[curDiff].bpmlist.bpms.push_back({bpmStart, curTime, curBpm});
 }
@@ -453,10 +475,19 @@ int main(){
 	ofstream infoOut("output/info.txt");
 	
 	cout << "要解析的谱面：";
-	cin >> origPath;
+	getline(cin,origPath);
 	
 	s = get_file(origPath.c_str());
 	decodeSimai(s);
+	
+	cout << "文件路径：";
+	getline(cin,metadata.path);
+	
+	cout << "音乐文件名：";
+	getline(cin,metadata.song);
+	
+	cout << "曲绘文件名：";
+	getline(cin,metadata.picture);
 	
 	cout << "文件解析成功。检测到以下难度的谱面。请输入要转换的谱面的编号：\n";
 	for(int i=0; i<=6; i++)
@@ -465,8 +496,11 @@ int main(){
 	cin >> targetDiff;
 	
 	infoOut << "#\nName: " << metadata.songName 
-			<< "\nPath: \nSong: \nPicture: \nChart: \nLevel: " 
-				<< metadata.maimaiCharts[targetDiff].diff <<" Lv." << metadata.maimaiCharts[targetDiff].lv
+			<< "\nPath: " << metadata.path 
+			<< "\nSong: " << metadata.song
+			<< "\nPicture: " << metadata.picture
+			<< "\nChart: " << metadata.chart
+			<< "\nLevel: " << metadata.maimaiCharts[targetDiff].diff <<" Lv." << metadata.maimaiCharts[targetDiff].lv
 			<< "\nComposer: " << metadata.artist
 			<< "\nCharter: "<< metadata.maimaiCharts[targetDiff].charter;
 	
