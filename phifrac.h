@@ -147,6 +147,9 @@ phifrac operator %(phifrac x,phifrac y){
 	return res;
 }
 
+std::ostream& operator << (std::ostream& os,const phifrac& x){
+	return os << x.integer << " " << x.p << "/" << x.q;
+}
 
 
 

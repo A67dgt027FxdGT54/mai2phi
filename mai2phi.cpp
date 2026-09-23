@@ -372,6 +372,10 @@ void decodeSimai(const string& chart){
 			curTime = curTime + commaLen.to_beats(curBpm);
 			lastNote = -1;
 		}
+		else if(chart[i] == '`'){
+			curTime = curTime + secondsToBeats(curBpm, 0.001);
+			lastNote = -1;
+		}
 		else if(chart[i] == '/'){
 			lastNote = -1;
 		}
@@ -411,6 +415,7 @@ void decodeSimai(const string& chart){
 		}
 		else if(chart[i] == 'A' || chart[i] == 'B' || chart[i] == 'D' || chart[i] == 'E'){
 			if(i+1 >= chart.length()) continue;
+			if(chart[i+1] == '\n' || chart[i+1] == '\r') continue;
 			slide_seg_t slideSeg;
 			slideSeg.start.alpha = chart[i];
 			slideSeg.start.id = chart[i+1] - '0';
@@ -466,6 +471,19 @@ void decodeSimai(const string& chart){
 			if(lastNote == -1) continue;
 			maimaiCharts[curDiff].notes[lastNote].isStarInstant = 1;
 		}
+		else if(chart[i] == '*'){
+			if(lastNote == -1) continue;
+			slide_seg_t slideSeg;
+			slideSeg.start.alpha = 'K';
+			slideSeg.start.id = maimaiCharts[curDiff].notes[lastNote].segs[0].start.id;
+			maimai_note_t note;
+			note.type = 0;
+			note.start = curTime;
+			note.end = curTime;
+			note.segs.push_back(slideSeg);
+			maimaiCharts[curDiff].notes.push_back(note);
+			lastNote = maimaiCharts[curDiff].notes.size() - 1;
+		}
 	}
 	maimaiCharts[curDiff].bpmlist.bpms.push_back({bpmStart, curTime, curBpm});
 }
@@ -503,8 +521,8 @@ int main(){
 			<< "\nLevel: " << metadata.maimaiCharts[targetDiff].diff <<" Lv." << metadata.maimaiCharts[targetDiff].lv
 			<< "\nComposer: " << metadata.artist
 			<< "\nCharter: "<< metadata.maimaiCharts[targetDiff].charter;
-	
-//	for(maimai_note_t g : maimaiCharts[targetDiff].notes ){
-//		cout << g.
-//	}
+	maimai_note_t g;
+	for(maimai_note_t g : maimaiCharts[targetDiff].notes ){
+		cout << "Type: " << g.type << " Start: " << g.start << " End: " << g.end << " Key: " << g.segs[0].start.id << "\n";
+	}
 }
