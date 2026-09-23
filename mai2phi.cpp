@@ -40,7 +40,7 @@ struct chart_metadata_t{
 struct metadata_t{
 	string songName = "UK";
 	string artist = "UK";
-	string path = "placeholder";
+	string id = "placeholder";
 	string song = "track.mp3";
 	string picture = "bg.png";
 	string chart = "chart.json";
@@ -488,6 +488,41 @@ void decodeSimai(const string& chart){
 	maimaiCharts[curDiff].bpmlist.bpms.push_back({bpmStart, curTime, curBpm});
 }
 
+struct phigros_control_point_t{
+	float value = 1.0f;
+	int easing = 1;
+	float x = 0.0f;
+	phigros_control_point_t(float aX, float defaultValue):x(aX), value(defaultValue){
+	}
+};
+struct phigros_control_list_t{
+	vector<phigros_control_point_t> points;
+	phigros_control_list_t(float defaultValue){
+		points.push_back(phigros_control_point_t{0.0f, defaultValue});
+		points.push_back(phigros_control_point_t{9999999.0f, defaultValue});
+	}
+};
+
+struct phigros_judgeline_t{
+	int Group = 0;
+	string Name = "Untitled";
+	string Texture = "line.png";
+	phigros_control_list_t alphaControl(1.0f),
+						   posControl(1.0f),
+						   sizeControl(1.0f),
+						   skewControl(0.0f),
+						   yControl(1.0f);
+};
+
+struct phigros_chart_data_t{
+	int RPEVersion = 140;
+	string level = "UK Lv.10"; 
+	vector<string> judgeLineGroup;
+	vector<phigros_judgeline_t> judgeLineList;
+	string multiLineString = "";
+	float multiScale = 1.0f;
+};
+
 int main(){
 	string s,origPath;
 	ofstream infoOut("output/info.txt");
@@ -498,8 +533,8 @@ int main(){
 	s = get_file(origPath.c_str());
 	decodeSimai(s);
 	
-	cout << "文件路径：";
-	getline(cin,metadata.path);
+	cout << "谱面 ID：";
+	getline(cin,metadata.id);
 	
 	cout << "音乐文件名：";
 	getline(cin,metadata.song);
@@ -514,14 +549,13 @@ int main(){
 	cin >> targetDiff;
 	
 	infoOut << "#\nName: " << metadata.songName 
-			<< "\nPath: " << metadata.path 
+			<< "\nPath: " << metadata.id 
 			<< "\nSong: " << metadata.song
 			<< "\nPicture: " << metadata.picture
 			<< "\nChart: " << metadata.chart
 			<< "\nLevel: " << metadata.maimaiCharts[targetDiff].diff <<" Lv." << metadata.maimaiCharts[targetDiff].lv
 			<< "\nComposer: " << metadata.artist
 			<< "\nCharter: "<< metadata.maimaiCharts[targetDiff].charter;
-	maimai_note_t g;
 	for(maimai_note_t g : maimaiCharts[targetDiff].notes ){
 		cout << "Type: " << g.type << " Start: " << g.start << " End: " << g.end << " Key: " << g.segs[0].start.id << "\n";
 	}
