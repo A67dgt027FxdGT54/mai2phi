@@ -489,9 +489,10 @@ void decodeSimai(const string& chart){
 }
 
 struct phigros_control_point_t{
+	float x = 0.0f;
 	float value = 1.0f;
 	int easing = 1;
-	float x = 0.0f;
+	phigros_control_point_t() = default;
 	phigros_control_point_t(float aX, float defaultValue):x(aX), value(defaultValue){
 	}
 };
@@ -502,9 +503,45 @@ struct phigros_control_list_t{
 		points.push_back(phigros_control_point_t{9999999.0f, defaultValue});
 	}
 };
-
+template <typename Argument, Argument defaultArgument>
+struct phigros_event_t{
+	int bezier = 0;
+	float bezierPoints[4] = {0.0f, 0.0f, 0.0f, 0.0f};
+	float easingLeft = 0.0f, easingRight = 1.0f;
+	int easingType = 1;
+	Argument start = defaultArgument, end = defaultArgument;
+	phifrac endTime(2), startTime;
+	int linkgroup = 0;
+};
+struct phigros_event_layer_t{
+	vector<phigros_event_t<int, 0> > alphaEvents;
+	vector<phigros_event_t<float, 0.0f> > moveXEvents, moveYEvents, rotateEvents;
+	vector<phigros_event_t<float, 10.0f> > speedEvents;
+};
+struct phigros_extended_event_layer_t{
+	vector<phigros_event_t<float, 0.0f> > inclineEvents;
+};
+struct phigros_note_t{
+	int above = 1;
+	int alpha = 255;
+	phifrac startTime, endTime;
+	int isFake = 0;
+	float positionX = 0.0f;
+	float size = 1.0f;
+	float speed = 1.0f;
+	int type = 1; // 1=T, 2=H, 3=F, 4=D
+	float visibleTime = 999999.0f;
+	float yOffset = 0.0f;
+};
 struct phigros_judgeline_t{
 	int Group = 0;
+	float bpmfactor = 1.0f;
+	int father = -1;
+	int isCover = 1;
+	int numOfNotes(){
+		return notes.size();
+	}
+	int zOrder = 0;
 	string Name = "Untitled";
 	string Texture = "line.png";
 	phigros_control_list_t alphaControl(1.0f),
@@ -512,6 +549,9 @@ struct phigros_judgeline_t{
 						   sizeControl(1.0f),
 						   skewControl(0.0f),
 						   yControl(1.0f);
+	vector<phigros_event_layer_t> eventLayers;
+	phigros_extended_event_layer_t extended;
+	vector<phigros_note_t> notes;
 };
 
 struct phigros_chart_data_t{
