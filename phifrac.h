@@ -25,6 +25,24 @@ struct phifrac{
 	phifrac(int i):integer(i),p(0),q(1){
 	}
 	phifrac(float _f){ 
+		// common
+		integer = (long long)(_f);
+		float fp = _f - integer;
+		long long sSign = 1;
+		if(fp<0) sSign = -1, fp = -fp;
+		else if(fp==0){
+			p = 0;
+			q = 1;
+			return;
+		}
+		for(q=1;q<=16384;q++)
+			for(p=1;p<q;p++)
+				if(fabs((float)(p)/(float)(q)-fp) <= 1.0e-8) {
+					p = sSign * p;
+					return;
+				} 
+	
+	
 		// 1 - 8 - 23
 		unsigned int i;
 		std::memcpy(&i, &_f, sizeof i);

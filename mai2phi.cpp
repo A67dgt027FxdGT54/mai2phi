@@ -1,5 +1,8 @@
 #include <bits/stdc++.h>
 #include "phifrac.h"
+#include <glm/glm.hpp> 
+#include <glm/gtc/matrix_transform.hpp>
+#include <glm/gtc/type_ptr.hpp>
 using namespace std;
 
 void wlog(std::string level,std::string msg){
@@ -239,7 +242,7 @@ void decodeSimai(const string& chart){
 	bool isFirstBpm = true;
 	float curBpm = 120;
 	comma_length_t commaLen;
-	phifrac bpmStart, curTime;
+	phifrac bpmStart, curTime, fTime;
 	int lastNote = -1;
 	
 	for(int i=0;i<chart.length();i++){
@@ -369,7 +372,8 @@ void decodeSimai(const string& chart){
 			}
 		}
 		else if(chart[i] == ','){
-			curTime = curTime + commaLen.to_beats(curBpm);
+			fTime = fTime + commaLen.to_beats(curBpm);
+			curTime = fTime;
 			lastNote = -1;
 		}
 		else if(chart[i] == '`'){
@@ -412,6 +416,7 @@ void decodeSimai(const string& chart){
 				int R = 8 - L;
 				addSeg(curDiff, lastNote, end, string("LR"[int(L > R)], 1));
 			}
+			i+=1;
 		}
 		else if(chart[i] == 'A' || chart[i] == 'B' || chart[i] == 'D' || chart[i] == 'E'){
 			if(i+1 >= chart.length()) continue;
@@ -503,23 +508,23 @@ struct phigros_control_list_t{
 		points.push_back(phigros_control_point_t{9999999.0f, defaultValue});
 	}
 };
-template <typename Argument, Argument defaultArgument>
+template <typename Argument, int defaultArgument>
 struct phigros_event_t{
 	int bezier = 0;
 	float bezierPoints[4] = {0.0f, 0.0f, 0.0f, 0.0f};
 	float easingLeft = 0.0f, easingRight = 1.0f;
 	int easingType = 1;
 	Argument start = defaultArgument, end = defaultArgument;
-	phifrac endTime(2), startTime;
+	phifrac endTime=2, startTime;
 	int linkgroup = 0;
 };
 struct phigros_event_layer_t{
 	vector<phigros_event_t<int, 0> > alphaEvents;
-	vector<phigros_event_t<float, 0.0f> > moveXEvents, moveYEvents, rotateEvents;
-	vector<phigros_event_t<float, 10.0f> > speedEvents;
+	vector<phigros_event_t<float, 0> > moveXEvents, moveYEvents, rotateEvents;
+	vector<phigros_event_t<float, 10> > speedEvents;
 };
 struct phigros_extended_event_layer_t{
-	vector<phigros_event_t<float, 0.0f> > inclineEvents;
+	vector<phigros_event_t<float, 0> > inclineEvents;
 };
 struct phigros_note_t{
 	int above = 1;
@@ -544,11 +549,11 @@ struct phigros_judgeline_t{
 	int zOrder = 0;
 	string Name = "Untitled";
 	string Texture = "line.png";
-	phigros_control_list_t alphaControl(1.0f),
-						   posControl(1.0f),
-						   sizeControl(1.0f),
-						   skewControl(0.0f),
-						   yControl(1.0f);
+	phigros_control_list_t alphaControl{1.0f},
+						   posControl{1.0f},
+						   sizeControl{1.0f},
+						   skewControl{0.0f},
+						   yControl{1.0f};
 	vector<phigros_event_layer_t> eventLayers;
 	phigros_extended_event_layer_t extended;
 	vector<phigros_note_t> notes;
@@ -557,11 +562,17 @@ struct phigros_judgeline_t{
 struct phigros_chart_data_t{
 	int RPEVersion = 140;
 	string level = "UK Lv.10"; 
-	vector<string> judgeLineGroup;
+	vector<string> judgeLineGroup{1,"Default"};
 	vector<phigros_judgeline_t> judgeLineList;
 	string multiLineString = "";
 	float multiScale = 1.0f;
-};
+}phigrosChart;
+
+// coord: ¡À675 * ¡À450
+
+void translate_1(){ 
+	;
+}
 
 int main(){
 	string s,origPath;
