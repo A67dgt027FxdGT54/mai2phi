@@ -84,6 +84,7 @@ struct maimai_note_t{
 struct maimai_chart_data_t{
 	bpmlist_t bpmlist;
 	vector<maimai_note_t> notes;
+	phifrac endTime;
 }maimaiCharts[7];
 
 
@@ -249,6 +250,7 @@ void decodeSimai(const string& chart){
 			 if(chart[i] == '&'){
 			decodeFileHeader(chart,i,[&](int newDiff){
 				maimaiCharts[curDiff].bpmlist.bpms.push_back({bpmStart, curTime, curBpm});
+				maimaiCharts[curDiff].endTime = curTime;
 				curDiff = newDiff;
 				isFirstBpm = true;
 				curBpm = 120;
@@ -491,6 +493,7 @@ void decodeSimai(const string& chart){
 		}
 	}
 	maimaiCharts[curDiff].bpmlist.bpms.push_back({bpmStart, curTime, curBpm});
+	maimaiCharts[curDiff].endTime = curTime;
 }
 
 struct phigros_control_point_t{
@@ -570,8 +573,25 @@ struct phigros_chart_data_t{
 
 // coord: ¡À675 * ¡À450
 
-void translate_1(){ 
-	;
+void translate_1(maimai_chart_data_t& crt){ 
+	{ // 0
+		phigros_judgeline_t pj;
+		{
+			phigros_event_layer_t pel;
+			{
+				phigros_event_t<float, 0> pey;
+				{
+					pey.start = -300.0f;
+					pey.end   = -300.0f;
+					pey.startTime = 0;
+					pey.endTime = crt.endTime;
+				}
+				pel.moveYEvents.push_back(pey);
+			}
+			pj.eventLayers.push_back(pel);
+		}
+		phigrosChart.judgeLineList.push_back(pj);
+	}
 }
 
 int main(){
