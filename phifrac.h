@@ -169,6 +169,29 @@ std::ostream& operator << (std::ostream& os,const phifrac& x){
 	return os << x.integer << " " << x.p << "/" << x.q;
 }
 
+bool operator < (phifrac x, phifrac y){
+	x=normalize(x);
+	y=normalize(y);
+	if(x.integer != y.integer) return x.integer < y.integer;
+	else return (float)(x.p) / (float)(x.q) < (float)(y.p) / (float)(y.q);
+}
+bool operator > (phifrac x, phifrac y){
+	return y < x;
+}
+bool operator == (phifrac x, phifrac y){
+	x=normalize(x);
+	y=normalize(y);
+	return x.integer == y.integer && x.p == y.p && x.q == y.q;
+}
+bool operator <= (phifrac x, phifrac y){
+	return x < y || x == y;
+}
+bool operator >= (phifrac x, phifrac y){
+	return x > y || x == y;
+}
 
-
+phifrac operator +=(phifrac& x, phifrac y){
+	x = x + y;
+	return x;
+}
 

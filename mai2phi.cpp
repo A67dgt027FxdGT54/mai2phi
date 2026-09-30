@@ -573,24 +573,89 @@ struct phigros_chart_data_t{
 
 // coord: ¡À675 * ¡À450
 
-void translate_1(maimai_chart_data_t& crt){ 
-	{ // 0
-		phigros_judgeline_t pj;
-		{
-			phigros_event_layer_t pel;
-			{
-				phigros_event_t<float, 0> pey;
-				{
-					pey.start = -300.0f;
-					pey.end   = -300.0f;
-					pey.startTime = 0;
-					pey.endTime = crt.endTime;
-				}
-				pel.moveYEvents.push_back(pey);
-			}
-			pj.eventLayers.push_back(pel);
+float keyIdToPositionX(float keyId){
+	return -675.0f + 150.0f * keyId;
+}
+
+void config_1(maimai_chart_data_t& crt){ 
+	ifstream cfgi("config/1.txt");
+	float mX, mY;
+	int alpha;
+	float rotate, speed;
+	while(cfgi >> mX){
+		cfgi >> mY >> alpha >> rotate >> speed;
+		phigros_judgeline_t jl;
+		phigros_event_layer_t el; 
+		
+		phigros_event_t<int, 0> aEvent;
+		phigros_event_t<float, 0> mXEvent, mYEvent, rEvent;
+		phigros_event_t<float, 10> spdEvent;
+		
+		mXEvent.start = mXEvent.end = mX;
+		mXEvent.startTime = 0;
+		mXEvent.endTime = crt.endTime;
+		el.moveXEvents.push_back(mXEvent);
+		
+		mYEvent.start = mYEvent.end = mY;
+		mYEvent.startTime = 0;
+		mYEvent.endTime = crt.endTime;
+		el.moveYEvents.push_back(mYEvent);
+		
+		aEvent.start = aEvent.end = alpha;
+		aEvent.startTime = 0;
+		aEvent.endTime = crt.endTime;
+		el.alphaEvents.push_back(aEvent);
+		
+		rEvent.start = rEvent.end = rotate;
+		rEvent.startTime = 0;
+		rEvent.endTime = crt.endTime;
+		el.rotateEvents.push_back(rEvent);
+		
+		if(speed >= 0){
+			spdEvent.start = spdEvent.end = speed;
+			spdEvent.startTime = 0;
+			spdEvent.endTime = crt.endTime;
+			el.speedEvents.push_back(spdEvent);
 		}
-		phigrosChart.judgeLineList.push_back(pj);
+		
+		jl.eventLayers.push_back(el);
+		phigrosChart.judgeLineList.push_back(jl);
+	}
+}
+void translate_1(maimai_chart_data_t& crt){ // param: maimaiCharts[...]
+	config_1(crt);
+//	maimai_note_t& mNote;
+	for(maimai_note_t& mNote: crt.notes){
+		phigros_note_t pNote;
+		if(mNote.type == 0){
+			int keyId=mNote.segs[0].start.id;
+			if(!mNote.isHold){ // tap
+				pNote.type = 1;
+				pNote.startTime = pNote.endTime = mNote.start;
+			}
+			else{ // hold
+				pNote.type = 2;
+				pNote.startTime = mNote.start;
+				pNote.endTime   = mNote.end;
+			}
+			pNote.positionX = keyIdToPositionX(keyId);
+			phigrosChart.judgeLineList[0].notes.push_back(pNote);
+			if(mNote.isHeadBreak){ // break
+				phigros_note_t drag;
+				drag.type = 4;
+				drag.positionX = keyIdToPositionX(keyId);
+				if(!mNote.isHold){
+					drag.startTime = drag.endTime = mNote.start;
+					phigrosChart.judgeLineList[0].notes.push_back(drag);
+				}
+				else{
+					for(phifrac t = mNote.start; t <= mNote.end; t += phifrac(0.5f)){
+						drag.startTime = drag.endTime = t;
+						phigrosChart.judgeLineList[0].notes.push_back(drag);
+					}
+				}
+			}
+		}
 	}
 }
 
