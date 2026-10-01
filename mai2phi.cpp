@@ -577,6 +577,102 @@ float keyIdToPositionX(float keyId){
 	return -675.0f + 150.0f * keyId;
 }
 
+float getSlidePQPPQQSegLength(char type, glm::vec2 O, glm::vec2 S, glm::vec2 E, float R){
+	float radSGamma = glm::radians(360.0f) - glm::acos(glm::normalize(S - O).x);
+	float sLen = glm::length(S - O);
+	float sTan = sqrt(sLen * sLen - R * R);
+	float radSAlpha = glm::asin(sTan / sLen);
+	float radSAngle;
+	if(type == 'p') radSAngle = radSGamma + radSAlpha;
+	else if(type == 'q') radSAngle = radSGamma - radSAlpha;
+	
+	float radEGamma = glm::radians(360.0f) - glm::acos(glm::normalize(E - O).x);
+	float eLen = glm::length(E - O);
+	float eTan = sqrt(eLen * eLen - R * R);
+	float radEAlpha = glm::asin(eTan / eLen);
+	float radEAngle;
+	if(type == 'p') radEAngle = radEGamma + radEAlpha;
+	else if(type == 'q') radEAngle = radEGamma - radEAlpha;
+	
+	float radAngle;
+	if(radAngle > glm::radians(360.0f) - 1e-4f) radAngle = glm::radians(360.0f);
+	if(radAngle < 1e-4f) radAngle = 0;
+	if(type == 'p') radAngle = fmod(radEAngle - radSAngle + glm::radians(360.0f), glm::radians(360.0f));
+	else if(type == 'q') radAngle = fmod(radSAngle - radEAngle + glm::radians(360.0f), glm::radians(360.0f));
+	if(radAngle > glm::radians(360.0f) - 1e-4f) radAngle = glm::radians(360.0f);
+	if(radAngle < 1e-4f) radAngle = 0;
+	return sLen + R * radAngle + eLen;
+}
+float getSlideSegLength(slide_seg_t& ss){
+	const float pi = glm::radians(180.0f);
+	const glm::vec2 C = glm::vec2(0.0f, 250.0f);
+	const glm::vec2 S = glm::vec2(keyIdToPositionX(ss.start.id), -300.0f);
+	const glm::vec2 E = glm::vec2(keyIdToPositionX(ss.end.id), -300.0f);
+	const float R = 150.0f;
+	
+	if(ss.type == "-"){
+		return fabs(keyIdToPositionX(ss.start.id) - keyIdToPositionX(ss.end.id));
+	}
+	else if(ss.type == "L"){
+		float len = keyIdToPositionX(ss.start.id) - keyIdToPositionX(ss.end.id);
+		if(len < 0.0f) len = 8.0f * 150.0f + len;
+		return pi * (len + 200.0f) / 2.0f;
+	}
+	else if(ss.type == "R"){
+		float len = keyIdToPositionX(ss.end.id) - keyIdToPositionX(ss.start.id);
+		if(len < 0.0f) len = 8.0f * 150.0f + len;
+		return pi * (len + 200.0f) / 2.0f;
+	}
+	else if(ss.type == "v"){
+		return glm::length(C-S) + glm::length(E-C);
+	}
+	else if(ss.type == "p"){
+		return getSlidePQPPQQSegLength('p', C, S, E, R);
+	}
+	else if(ss.type == "q"){
+		return getSlidePQPPQQSegLength('q', C, S, E, R);
+	}
+	else if(ss.type == "pp"){
+		glm::vec2 O = glm::vec2(keyIdToPositionX((1.0f * ss.start.id + 1.0f * ss.end.id) / 2.0f), -50.0f);
+		return getSlidePQPPQQSegLength('p', O, S, E, R);
+	}
+	else if(ss.type == "qq"){
+		glm::vec2 O = glm::vec2(keyIdToPositionX((1.0f * ss.start.id + 1.0f * ss.end.id) / 2.0f), -50.0f);
+		return getSlidePQPPQQSegLength('q', O, S, E, R);
+	}
+	else if(ss.type == "s" || ss.type == "z"){
+		glm::vec2 O = glm::vec2(keyIdToPositionX((1.0f * ss.start.id + 1.0f * ss.end.id) / 2.0f), -200.0f);
+		return glm::length(O - S) * 2.0f + 200.0f;
+	}
+	else if(ss.type == "w"){
+		return 600.0f;
+	}
+	else if(ss.type == "N"){
+		return 0.0f;
+	}
+}
+void addNotesForSeg(slide_seg_t& ss, phifrac curTime, phifrac T){
+	if(ss.type == "-"){
+		phifrac stride;
+		stride.p = 1, stride.q = 16;
+		// stride == 0+1/16 now
+		
+		phigros_note_t drag;
+		drag.type = 4;
+		
+		int totDrag = min(2,normalize(T / stride).integer + 1);
+		for(int i = 0; i < totDrag; i++){
+			drag.startTime = drag.endTime = curTime + stride * phifrac(i);
+			drag.positionX = glm::mix(
+				keyIdToPositionX(ss.start.id),
+				keyIdToPositionX(ss.end.id),
+				1.0f * i / (1.0f * (totDrag-1))
+			);
+			phigrosChart.judgeLineList[0].notes.push_back(drag);
+		}
+	}
+}
+
 void config_1(maimai_chart_data_t& crt){ 
 	ifstream cfgi("config/1.txt");
 	float mX, mY;
@@ -624,7 +720,7 @@ void config_1(maimai_chart_data_t& crt){
 }
 void translate_1(maimai_chart_data_t& crt){ // param: maimaiCharts[...]
 	config_1(crt);
-//	maimai_note_t& mNote;
+	maimai_note_t& mNote;
 	for(maimai_note_t& mNote: crt.notes){
 		phigros_note_t pNote;
 		if(mNote.type == 0){
@@ -716,6 +812,37 @@ void translate_1(maimai_chart_data_t& crt){ // param: maimaiCharts[...]
 				hold.positionX = horiLineX;
 				hold.visibleTime = 0.25f;
 				phigrosChart.judgeLineList[horiLineId].notes.push_back(hold);
+			}
+		} 
+		else if(mNote.type == 2){ // slide
+			
+			// ----------------------
+			//  star in maimai -> tap
+			phigros_note_t tap;
+			tap.type = 1;
+			tap.startTime = tap.endTime = mNote.start;
+			tap.positionX = keyIdToPositionX(mNote.segs[0].start.id);
+			phigrosChart.judgeLineList[0].notes.push_back(tap);
+			
+			// ----------------------
+			//  calc for ratio
+			slide_seg_t ss;
+			float totLength = 0.0f;
+			phifrac totTime = mNote.end - mNote.start - mNote.slideDelta;
+			vector<float> lengthCache;
+			for(slide_seg_t& ss: mNote.segs){
+				lengthCache.push_back(getSlideSegLength(ss));
+				totLength += lengthCache[lengthCache.size()-1];
+			}
+			
+			// ----------------------
+			//  main
+			phifrac curTime = mNote.start + mNote.slideDelta;
+			for(int i = 0; i + 1 < mNote.segs.size(); i++){
+				slide_seg_t& ss = mNote.segs[i];
+				phifrac t = phifrac(lengthCache[i] / totLength) * totTime;
+				addNotesForSeg(ss, curTime, t); // todo
+				curTime = curTime + t;
 			}
 		} 
 	}
