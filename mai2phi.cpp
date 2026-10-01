@@ -656,6 +656,68 @@ void translate_1(maimai_chart_data_t& crt){ // param: maimaiCharts[...]
 				}
 			}
 		}
+		else if(mNote.type == 1){ // touch
+			int horiLineId, vertLineId;
+			float horiLineX, vertLineX;
+			char alpha = mNote.segs[0].start.alpha;
+			int id = mNote.segs[0].start.id;
+			if(alpha == 'C'){
+				horiLineId = 19;
+				horiLineX  = 0.0f;
+				vertLineId = 12;
+				vertLineX  = 250.0f;
+			}
+			else if(alpha == 'A'){
+				horiLineId = 26;
+				horiLineX  = keyIdToPositionX(id);
+				vertLineId = id;
+				vertLineX  = -300.0f;
+			}
+			else if(alpha == 'D'){
+				horiLineId = 26;
+				horiLineX  = keyIdToPositionX(id + 0.5f);
+				vertLineId = id + 8;
+				vertLineX  = -300.0f;
+			}
+			else if(alpha == 'E'){
+				horiLineId = 17;
+				horiLineX  = keyIdToPositionX(id + 0.5f);
+				vertLineId = id + 8;
+				vertLineX  = -100.0f;
+			}
+			else if(alpha == 'B'){
+				horiLineId = 18;
+				horiLineX  = keyIdToPositionX(id);
+				vertLineId = id;
+				vertLineX  = 100.0f;
+			}
+			phigros_note_t drag;
+			drag.type = 4;
+			drag.startTime = drag.endTime = mNote.start;
+			drag.visibleTime = 0.25f;
+			// hori
+			drag.above = 1;
+			drag.positionX = horiLineX;
+			phigrosChart.judgeLineList[horiLineId].notes.push_back(drag);
+			drag.above = 0;
+			phigrosChart.judgeLineList[horiLineId].notes.push_back(drag);
+			// vert
+			drag.above = 1;
+			drag.positionX = vertLineX;
+			phigrosChart.judgeLineList[vertLineId].notes.push_back(drag);
+			drag.above = 0;
+			phigrosChart.judgeLineList[vertLineId].notes.push_back(drag);
+			if(mNote.isHold){
+				phigros_note_t hold;
+				hold.type = 2;
+				hold.startTime = mNote.start;
+				hold.endTime = mNote.end;
+				hold.speed = 0.5f;
+				hold.positionX = horiLineX;
+				hold.visibleTime = 0.25f;
+				phigrosChart.judgeLineList[horiLineId].notes.push_back(hold);
+			}
+		} 
 	}
 }
 
