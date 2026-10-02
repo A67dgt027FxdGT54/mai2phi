@@ -258,6 +258,7 @@ void decodeSimai(const string& chart){
 				bpmStart = 0;
 				curTime = 0;
 				lastNote = -1;
+				fTime = 0; 
 			});
 		}
 		else if(chart[i] == '('){
@@ -408,10 +409,10 @@ void decodeSimai(const string& chart){
 			int start = maimaiCharts[curDiff].notes[lastNote].segs[lastSeg].start.id;
 			int end = chart[i+1] - '0';
 			if(chart[i] == '<'){
-				addSeg(curDiff, lastNote, end, string(" LLRRRRLL"[start], 1));
+				addSeg(curDiff, lastNote, end, string(1, " LLRRRRLL"[start]));
 			}
 			else if(chart[i] == '>'){
-				addSeg(curDiff, lastNote, end, string(" RRLLLLRR"[start], 1));
+				addSeg(curDiff, lastNote, end, string(1, " RRLLLLRR"[start]));
 			}
 			else if(chart[i] == '^'){
 				int L = (start + 8 - end) % 8;
@@ -577,7 +578,13 @@ float keyIdToPositionX(float keyId){
 	return -675.0f + 150.0f * keyId;
 }
 
-float getSlidePQPPQQSegLength(char type, glm::vec2 O, glm::vec2 S, glm::vec2 E, float R){
+struct slidePQPPQQSegCache_t{
+	float radSAngle=0.0f, radEAngle=0.0f, radAngle=0.0f, sLen=0.0f, eLen=0.0f, cLen=0.0f, totLen=0.0f;
+	glm::vec2 O = glm::vec2{0.0f};
+	glm::vec2 S = glm::vec2{0.0f};
+	glm::vec2 E = glm::vec2{0.0f};
+};
+float getSlidePQPPQQSegLength(char type, glm::vec2 O, glm::vec2 S, glm::vec2 E, float R, slidePQPPQQSegCache_t& cache){
 	float radSGamma = glm::radians(360.0f) - glm::acos(glm::normalize(S - O).x);
 	float sLen = glm::length(S - O);
 	float sTan = sqrt(sLen * sLen - R * R);
@@ -595,15 +602,23 @@ float getSlidePQPPQQSegLength(char type, glm::vec2 O, glm::vec2 S, glm::vec2 E, 
 	else if(type == 'q') radEAngle = radEGamma - radEAlpha;
 	
 	float radAngle;
-	if(radAngle > glm::radians(360.0f) - 1e-4f) radAngle = glm::radians(360.0f);
-	if(radAngle < 1e-4f) radAngle = 0;
 	if(type == 'p') radAngle = fmod(radEAngle - radSAngle + glm::radians(360.0f), glm::radians(360.0f));
 	else if(type == 'q') radAngle = fmod(radSAngle - radEAngle + glm::radians(360.0f), glm::radians(360.0f));
 	if(radAngle > glm::radians(360.0f) - 1e-4f) radAngle = glm::radians(360.0f);
 	if(radAngle < 1e-4f) radAngle = 0;
-	return sLen + R * radAngle + eLen;
+	cache.radSAngle = radSAngle;
+	cache.radEAngle = radEAngle;
+	cache.radAngle = radAngle;
+	cache.O = O;
+	cache.S = S;
+	cache.E = E;
+	cache.sLen = sTan;
+	cache.eLen = eTan;
+	cache.cLen = R * radAngle;
+	cache.totLen = sTan + R * radAngle + eTan;
+	return cache.totLen;
 }
-float getSlideSegLength(slide_seg_t& ss){
+float getSlideSegLength(slide_seg_t& ss, slidePQPPQQSegCache_t& cache){
 	const float pi = glm::radians(180.0f);
 	const glm::vec2 C = glm::vec2(0.0f, 250.0f);
 	const glm::vec2 S = glm::vec2(keyIdToPositionX(ss.start.id), -300.0f);
@@ -627,18 +642,18 @@ float getSlideSegLength(slide_seg_t& ss){
 		return glm::length(C-S) + glm::length(E-C);
 	}
 	else if(ss.type == "p"){
-		return getSlidePQPPQQSegLength('p', C, S, E, R);
+		return getSlidePQPPQQSegLength('p', C, S, E, R, cache);
 	}
 	else if(ss.type == "q"){
-		return getSlidePQPPQQSegLength('q', C, S, E, R);
+		return getSlidePQPPQQSegLength('q', C, S, E, R, cache);
 	}
 	else if(ss.type == "pp"){
 		glm::vec2 O = glm::vec2(keyIdToPositionX((1.0f * ss.start.id + 1.0f * ss.end.id) / 2.0f), -50.0f);
-		return getSlidePQPPQQSegLength('p', O, S, E, R);
+		return getSlidePQPPQQSegLength('p', O, S, E, R, cache);
 	}
 	else if(ss.type == "qq"){
 		glm::vec2 O = glm::vec2(keyIdToPositionX((1.0f * ss.start.id + 1.0f * ss.end.id) / 2.0f), -50.0f);
-		return getSlidePQPPQQSegLength('q', O, S, E, R);
+		return getSlidePQPPQQSegLength('q', O, S, E, R, cache);
 	}
 	else if(ss.type == "s" || ss.type == "z"){
 		glm::vec2 O = glm::vec2(keyIdToPositionX((1.0f * ss.start.id + 1.0f * ss.end.id) / 2.0f), -200.0f);
@@ -651,27 +666,192 @@ float getSlideSegLength(slide_seg_t& ss){
 		return 0.0f;
 	}
 }
-void addNotesForSeg(slide_seg_t& ss, phifrac curTime, phifrac T){
-	if(ss.type == "-"){
-		phifrac stride;
-		stride.p = 1, stride.q = 16;
-		// stride == 0+1/16 now
-		
-		phigros_note_t drag;
-		drag.type = 4;
-		
-		int totDrag = min(2,normalize(T / stride).integer + 1);
-		for(int i = 0; i < totDrag; i++){
-			drag.startTime = drag.endTime = curTime + stride * phifrac(i);
-			drag.positionX = glm::mix(
-				keyIdToPositionX(ss.start.id),
-				keyIdToPositionX(ss.end.id),
-				1.0f * i / (1.0f * (totDrag-1))
-			);
-			phigrosChart.judgeLineList[0].notes.push_back(drag);
-		}
+void addDragSnake(int sid, int eid, int segDrag, phifrac curTime, phifrac stride){
+	phigros_note_t drag;
+	drag.type = 4;
+	drag.speed = 0.0f;
+	for(int i = 0; i < segDrag; i++){
+		drag.startTime = drag.endTime = curTime;
+		drag.positionX = glm::mix(
+			keyIdToPositionX(sid),
+			keyIdToPositionX(eid),
+			1.0f * i / (1.0f * (segDrag-1))
+		);
+		phigrosChart.judgeLineList[0].notes.push_back(drag);
+		curTime += stride;
 	}
 }
+void addDragLine(int totDrag, glm::vec2 S, glm::vec2 E, phifrac curTime, phifrac stride){
+	phigros_note_t drag;
+	drag.type = 4;
+	drag.speed = 0.0f;
+	for(int i = 0; i < totDrag; i++){
+		float ratio = 1.0f * i / (1.0f * (totDrag-1));
+		drag.startTime = drag.endTime = curTime;
+		drag.positionX = glm::mix(S.x, E.x, ratio);
+		drag.yOffset = 300.0f + glm::mix(S.y, E.y, ratio);
+		phigrosChart.judgeLineList[0].notes.push_back(drag);
+		curTime += stride;
+	} 
+}
+
+int normalizeKeyId(int x){
+	return (x+7)%8+1;
+}
+
+void addNotesForSegPQPPQQC(slidePQPPQQSegCache_t& cache, int totDrag, phifrac curTime, phifrac stride, float R){
+	phigros_note_t drag;
+	drag.type = 4;
+	drag.speed = 0.0f;
+	for(int i=0; i < totDrag; i++){
+		float ratio = 1.0f * i / (1.0f * (totDrag-1));
+		drag.startTime = drag.endTime = curTime;
+		float radAngle = glm::mix(cache.radSAngle, cache.radEAngle, ratio);
+		drag.positionX = cache.O.x + R * glm::cos(radAngle);
+		drag.yOffset = 300.0f + cache.O.y + R * glm::sin(radAngle);
+		phigrosChart.judgeLineList[0].notes.push_back(drag);
+		curTime += stride;
+	}
+	
+}
+void addNotesForSegPQPPQQ(char type, slidePQPPQQSegCache_t& cache, int totDrag, phifrac curTime, phifrac stride, phifrac segTime){
+	const float R = 150.0f;
+	glm::vec2 M1 = cache.O + R * glm::vec2(glm::cos(cache.radSAngle), glm::sin(cache.radSAngle));
+	glm::vec2 M2 = cache.O + R * glm::vec2(glm::cos(cache.radEAngle), glm::sin(cache.radEAngle));
+	float ratioS = cache.sLen / cache.totLen;
+	float ratioC = cache.cLen / cache.totLen;
+	int dS = max(2, (int)(totDrag * ratioS));
+	int dC = max(2, (int)(totDrag * ratioC));
+	int dE = max(2, (int)(totDrag - dS - dC)); 
+	stride = segTime / (dS + dC + dE - 1);
+	addDragLine(dS, cache.S, M1, curTime, stride);
+	curTime += stride * dS;
+	if(type == 'p'){
+		if(cache.radEAngle <= cache.radSAngle) cache.radEAngle += glm::radians(360.0f);
+	}
+	else{
+		if(cache.radEAngle >= cache.radSAngle) cache.radSAngle += glm::radians(360.0f);
+	}
+	addNotesForSegPQPPQQC(cache, dC, curTime, stride, R);
+	curTime += stride * dC;
+	addDragLine(dE, M2, cache.E, curTime, stride);
+}
+void addNotesForSeg(slide_seg_t& ss, phifrac curTime, phifrac segTime, slidePQPPQQSegCache_t& cache){
+	phifrac stride;
+	phigros_note_t drag;
+	drag.type = 4;
+	
+	int totDrag = max(2LL,normalize(segTime / phifrac(1, 16)).integer + 1);
+	stride = segTime / (totDrag-1);
+	
+	if(ss.type == "-"){
+		addDragSnake(ss.start.id, ss.end.id, totDrag, curTime, stride);
+	}
+	else if(ss.type == "L"){
+		int sid=ss.start.id, eid=ss.end.id;
+		if(sid <= eid) eid -= 8; 
+		float s = keyIdToPositionX(sid);
+		float e = keyIdToPositionX(eid);
+		float mid = (s + e) / 2.0f;
+		drag.speed = 0.0f;
+		
+		for(int i = 0; i < totDrag; i++){
+			drag.startTime = drag.endTime = curTime;
+			float ratio = 1.0f * i / (1.0f * (totDrag-1));
+			drag.yOffset = 200.0f * glm::sin(ratio * glm::radians(180.0f));
+			drag.positionX = mid + (mid - e) * glm::cos(ratio * glm::radians(180.0f));
+			if(drag.positionX < -600.0f) drag.positionX += 8 * 150.0f;
+			phigrosChart.judgeLineList[0].notes.push_back(drag);
+			curTime += stride; 
+		}
+	}
+	else if(ss.type == "R"){
+		int sid=ss.start.id, eid=ss.end.id;
+		if(sid >= eid) eid += 8; 
+		float s = keyIdToPositionX(sid);
+		float e = keyIdToPositionX(eid);
+		float mid = (s + e) / 2.0f;
+		drag.speed = 0.0f;
+		
+		for(int i = 0; i < totDrag; i++){
+			drag.startTime = drag.endTime = curTime;
+			float ratio = 1.0f * i / (1.0f * (totDrag-1));
+			drag.yOffset = 200.0f * glm::sin(ratio * glm::radians(180.0f));
+			drag.positionX = mid + (mid - e) * glm::cos(ratio * glm::radians(180.0f));
+			if(drag.positionX > 600.0f) drag.positionX -= 8 * 150.0f;
+			phigrosChart.judgeLineList[0].notes.push_back(drag);
+			curTime += stride;
+		}
+	}
+	else if(ss.type == "v"){
+		glm::vec2 S = glm::vec2(keyIdToPositionX(ss.start.id), -300.0f); 
+		glm::vec2 E = glm::vec2(keyIdToPositionX(ss.end.id), -300.0f); 
+		glm::vec2 C = glm::vec2(0.0f, 250.0f);
+		float ratio = glm::length(C-S) / (glm::length(E-C) + glm::length(C-S));
+		int totDrag1 = max(2, int(ratio * totDrag));
+		int totDrag2 = max(2, totDrag - totDrag1);
+		stride = segTime / (totDrag1 + totDrag2 - 1);
+		addDragLine(totDrag1, S, C, curTime, stride); 
+		curTime += stride * totDrag1;
+		addDragLine(totDrag2, C, E, curTime, stride); 
+	}
+	else if(ss.type == "s"){
+		glm::vec2 S = glm::vec2(keyIdToPositionX(ss.start.id), -300.0f); 
+		glm::vec2 E = glm::vec2(keyIdToPositionX(ss.end.id), -300.0f); 
+		float mid = (keyIdToPositionX(ss.start.id) + keyIdToPositionX(ss.end.id)) / 2;
+		glm::vec2 M1= glm::vec2(mid, 0.0f);
+		if(ss.start.id < ss.end.id) M1.y = -400.0f;
+		else M1.y = -200.0f;
+		glm::vec2 M2= M1;
+		M2.y = -600.0f - M1.y;
+		
+		float l1 = glm::length(M1 - S);
+		float l2 = 200.0f;
+		float totLength = l1 * 2 + l2;
+		float ratio = l1 / totLength;
+		int d1 = max(2, int(totDrag * ratio));
+		int d2 = max(2, totDrag - 2 * d1);
+		stride = segTime / (d1 * 2 + d2 - 1);
+		addDragLine(d1, S, M1, curTime, stride);
+		curTime += stride * d1;
+		addDragLine(d2, M1, M2, curTime, stride);
+		curTime += stride * d2;
+		addDragLine(d1, M2, E, curTime, stride);
+	}
+	else if(ss.type == "z"){
+		glm::vec2 S = glm::vec2(keyIdToPositionX(ss.start.id), -300.0f); 
+		glm::vec2 E = glm::vec2(keyIdToPositionX(ss.end.id), -300.0f); 
+		float mid = (keyIdToPositionX(ss.start.id) + keyIdToPositionX(ss.end.id)) / 2;
+		glm::vec2 M1= glm::vec2(mid, 0.0f);
+		if(ss.start.id > ss.end.id) M1.y = -400.0f;
+		else M1.y = -200.0f;
+		glm::vec2 M2= M1;
+		M2.y = -600.0f - M1.y;
+		
+		float l1 = glm::length(M1 - S);
+		float l2 = 200.0f;
+		float totLength = l1 * 2 + l2;
+		float ratio = l1 / totLength;
+		int d1 = totDrag * ratio;
+		int d2 = totDrag - 2 * d1;
+		stride = segTime / (d1 * 2 + d2 - 1);
+		addDragLine(d1, S, M1, curTime, stride);
+		curTime += stride * d1;
+		addDragLine(d2, M1, M2, curTime, stride);
+		curTime += stride * d2;
+		addDragLine(d1, M2, E, curTime, stride);
+	}
+	else if(ss.type == "w"){
+		phifrac curTime1 = curTime, curTime2 = curTime;
+		addDragSnake(ss.start.id, normalizeKeyId(ss.end.id-1), totDrag, curTime1, stride);
+		addDragSnake(ss.start.id, normalizeKeyId(ss.end.id), totDrag, curTime, stride);
+		addDragSnake(ss.start.id, normalizeKeyId(ss.end.id+1), totDrag, curTime2, stride);
+	}
+	else if(ss.type == "p" || ss.type == "q" || ss.type == "pp" || ss.type == "qq"){
+		addNotesForSegPQPPQQ(ss.type[0], cache, totDrag, curTime, stride, segTime);
+	}
+}
+
 
 void config_1(maimai_chart_data_t& crt){ 
 	ifstream cfgi("config/1.txt");
@@ -720,7 +900,7 @@ void config_1(maimai_chart_data_t& crt){
 }
 void translate_1(maimai_chart_data_t& crt){ // param: maimaiCharts[...]
 	config_1(crt);
-	maimai_note_t& mNote;
+//	maimai_note_t& mNote; // refer
 	for(maimai_note_t& mNote: crt.notes){
 		phigros_note_t pNote;
 		if(mNote.type == 0){
@@ -764,13 +944,13 @@ void translate_1(maimai_chart_data_t& crt){ // param: maimaiCharts[...]
 				vertLineX  = 250.0f;
 			}
 			else if(alpha == 'A'){
-				horiLineId = 26;
+				horiLineId = 20;
 				horiLineX  = keyIdToPositionX(id);
 				vertLineId = id;
 				vertLineX  = -300.0f;
 			}
 			else if(alpha == 'D'){
-				horiLineId = 26;
+				horiLineId = 20;
 				horiLineX  = keyIdToPositionX(id + 0.5f);
 				vertLineId = id + 8;
 				vertLineX  = -300.0f;
@@ -830,9 +1010,12 @@ void translate_1(maimai_chart_data_t& crt){ // param: maimaiCharts[...]
 			float totLength = 0.0f;
 			phifrac totTime = mNote.end - mNote.start - mNote.slideDelta;
 			vector<float> lengthCache;
+			vector<slidePQPPQQSegCache_t> angleCache;
 			for(slide_seg_t& ss: mNote.segs){
-				lengthCache.push_back(getSlideSegLength(ss));
+				slidePQPPQQSegCache_t cache;
+				lengthCache.push_back(getSlideSegLength(ss, cache));
 				totLength += lengthCache[lengthCache.size()-1];
+				angleCache.push_back(cache);
 			}
 			
 			// ----------------------
@@ -840,9 +1023,9 @@ void translate_1(maimai_chart_data_t& crt){ // param: maimaiCharts[...]
 			phifrac curTime = mNote.start + mNote.slideDelta;
 			for(int i = 0; i + 1 < mNote.segs.size(); i++){
 				slide_seg_t& ss = mNote.segs[i];
-				phifrac t = phifrac(lengthCache[i] / totLength) * totTime;
-				addNotesForSeg(ss, curTime, t); // todo
-				curTime = curTime + t;
+				phifrac segTime = phifrac(lengthCache[i] / totLength) * totTime;
+				addNotesForSeg(ss, curTime, segTime, angleCache[i]);
+				curTime = curTime + segTime;
 			}
 		} 
 	}

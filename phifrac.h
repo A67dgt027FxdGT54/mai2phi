@@ -21,7 +21,10 @@ struct phifrac{
 	long long integer,p,q;
 	phifrac():integer(0),p(0),q(1){
 	}
-	
+	phifrac(int _i, int _p, int _q):integer(_i),p(_p),q(_q){
+	}
+	phifrac(int _p, int _q):p(_p),q(_q){
+	}
 	phifrac(int i):integer(i),p(0),q(1){
 	}
 	phifrac(float _f){ 
