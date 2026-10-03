@@ -268,7 +268,7 @@ void decodeSimai(const string& chart){
 		}
 		else if(chart[i] == '('){
 			if(!isFirstBpm)
-				maimaiCharts[curDiff].bpmlist.bpms.push_back({bpmStart, curTime, curBpm});
+				maimaiCharts[curDiff].bpmlist.bpms.push_back({bpmStart, curTime, curBpm.integer + 1.0f * curBpm.p / (1.0f * curBpm.q)});
 			else isFirstBpm = 0;
 			bpmStart = curTime;
 			curBpm = to_phifrac(getValue(chart, i, ')'));
@@ -329,25 +329,29 @@ void decodeSimai(const string& chart){
 				phifrac times;
 				NoteLen = to_phifrac(getValue(timeLen, j, ':')); 
 				times = to_phifrac(getValue(timeLen, j, ']'));
-				maimaiCharts[curDiff].notes[lastNote].end = maimaiCharts[curDiff].notes[lastNote].start + NoteLenToBeats(NoteLen) * times;
+				maimaiCharts[curDiff].notes[lastNote].end = maimaiCharts[curDiff].notes[lastNote].start + NoteLenToBeats(NoteLen) * times + 
+					(maimaiCharts[curDiff].notes[lastNote].type == 2 ? maimaiCharts[curDiff].notes[lastNote].slideDelta : 0);
 			}
 			else if(format == "d"){
 				phifrac NoteLen;
 				NoteLen = to_phifrac(getValue(timeLen, j, ']')); 
-				maimaiCharts[curDiff].notes[lastNote].end = maimaiCharts[curDiff].notes[lastNote].start + NoteLenToBeats(NoteLen);
+				maimaiCharts[curDiff].notes[lastNote].end = maimaiCharts[curDiff].notes[lastNote].start + NoteLenToBeats(NoteLen) + 
+					(maimaiCharts[curDiff].notes[lastNote].type == 2 ? maimaiCharts[curDiff].notes[lastNote].slideDelta : 0);
 			}
 			else if(format == "#d:d"){
 				j++; // skip '#'
 				phifrac seconds, times;
 				seconds = to_phifrac(getValue(timeLen, j, ':'));
 				times = to_phifrac(getValue(timeLen, j, ']'));
-				maimaiCharts[curDiff].notes[lastNote].end = maimaiCharts[curDiff].notes[lastNote].start + secondsToBeats(curBpm, seconds * times);
+				maimaiCharts[curDiff].notes[lastNote].end = maimaiCharts[curDiff].notes[lastNote].start + secondsToBeats(curBpm, seconds * times) + 
+					(maimaiCharts[curDiff].notes[lastNote].type == 2 ? maimaiCharts[curDiff].notes[lastNote].slideDelta : 0);
 			}
 			else if(format == "#d"){
 				j++; // skip '#'
 				phifrac seconds;
 				seconds = to_phifrac(getValue(timeLen, j, ']'));
-				maimaiCharts[curDiff].notes[lastNote].end = maimaiCharts[curDiff].notes[lastNote].start + secondsToBeats(curBpm, seconds);
+				maimaiCharts[curDiff].notes[lastNote].end = maimaiCharts[curDiff].notes[lastNote].start + secondsToBeats(curBpm, seconds) + 
+					(maimaiCharts[curDiff].notes[lastNote].type == 2 ? maimaiCharts[curDiff].notes[lastNote].slideDelta : 0);
 			}
 			else if(format == "d#d:d"){
 				phifrac bpm, NoteLen, times;
@@ -356,27 +360,30 @@ void decodeSimai(const string& chart){
 				times = to_phifrac(getValue(timeLen, j, ']'));
 				maimaiCharts[curDiff].notes[lastNote].slideDelta = changeBpmOfBeats(bpm, curBpm, 1);
 				maimaiCharts[curDiff].notes[lastNote].end = 
-					maimaiCharts[curDiff].notes[lastNote].start + times * changeBpmOfNoteLen(bpm, curBpm, NoteLen);
+					maimaiCharts[curDiff].notes[lastNote].start + times * changeBpmOfNoteLen(bpm, curBpm, NoteLen) + 
+					(maimaiCharts[curDiff].notes[lastNote].type == 2 ? maimaiCharts[curDiff].notes[lastNote].slideDelta : 0);
 			}
 			else if(format == "d#d"){
-				phifrac bpm, seconds;
+				phifrac bpm, slidingSeconds;
 				bpm = to_phifrac(getValue(timeLen, j, '#'));
-				seconds = to_phifrac(getValue(timeLen, j, ']')); 
+				slidingSeconds = to_phifrac(getValue(timeLen, j, ']')); 
 				maimaiCharts[curDiff].notes[lastNote].slideDelta = changeBpmOfBeats(bpm, curBpm, 1);
 				maimaiCharts[curDiff].notes[lastNote].end = 
-					maimaiCharts[curDiff].notes[lastNote].start + secondsToBeats(curBpm, seconds);
+					maimaiCharts[curDiff].notes[lastNote].start + secondsToBeats(curBpm, slidingSeconds) + 
+					(maimaiCharts[curDiff].notes[lastNote].type == 2 ? maimaiCharts[curDiff].notes[lastNote].slideDelta : 0);
 			}
 			else if(format == "d##d"){
-				phifrac slideDeltaSeconds, totalSeconds;
+				phifrac slideDeltaSeconds, slidingSeconds;
 				
 				slideDeltaSeconds = to_phifrac(getValue(timeLen, j, '#'));
 				j += 1; // skip '##'
-				totalSeconds = to_phifrac(getValue(timeLen, j, ']'));
+				slidingSeconds = to_phifrac(getValue(timeLen, j, ']'));
 				
 				maimaiCharts[curDiff].notes[lastNote].slideDelta = secondsToBeats(curBpm, slideDeltaSeconds);
 				
 				maimaiCharts[curDiff].notes[lastNote].end = 
-					maimaiCharts[curDiff].notes[lastNote].start + secondsToBeats(curBpm, totalSeconds);
+					maimaiCharts[curDiff].notes[lastNote].start + secondsToBeats(curBpm, slidingSeconds) + 
+					(maimaiCharts[curDiff].notes[lastNote].type == 2 ? maimaiCharts[curDiff].notes[lastNote].slideDelta : 0);
 			}
 		}
 		else if(chart[i] == ','){
@@ -385,7 +392,7 @@ void decodeSimai(const string& chart){
 			lastNote = -1;
 		}
 		else if(chart[i] == '`'){
-			curTime = curTime + secondsToBeats(curBpm, 0.001);
+			curTime = curTime + secondsToBeats(curBpm, phifrac(1, 1000));
 			lastNote = -1;
 		}
 		else if(chart[i] == '/'){
@@ -498,7 +505,7 @@ void decodeSimai(const string& chart){
 			lastNote = maimaiCharts[curDiff].notes.size() - 1;
 		}
 	}
-	maimaiCharts[curDiff].bpmlist.bpms.push_back({bpmStart, curTime, curBpm.integer + curBpm.p / curBpm.q});
+	maimaiCharts[curDiff].bpmlist.bpms.push_back({bpmStart, curTime, curBpm.integer + 1.0f * curBpm.p / (1.0f * curBpm.q)});
 	maimaiCharts[curDiff].endTime = curTime;
 }
 
@@ -1071,12 +1078,13 @@ int main(){
 			<< "\nLevel: " << metadata.maimaiCharts[targetDiff].diff <<" Lv." << metadata.maimaiCharts[targetDiff].lv
 			<< "\nComposer: " << metadata.artist
 			<< "\nCharter: "<< metadata.maimaiCharts[targetDiff].charter;
-//	for(maimai_note_t g : maimaiCharts[targetDiff].notes ){
-//		cout << "Type: " << g.type << " Start: " << g.start << " End: " << g.end << " Key: " << g.segs[0].start.id << "\n";
-//	}
+	for(maimai_note_t g : maimaiCharts[targetDiff].notes ){
+		cout << "Type: " << g.type << " Start: " << g.start << " End: " << g.end << " Key: " << g.segs[0].start.alpha << g.segs[0].start.id << "\n";
+	}
 	
 	cout << "文件转换中. . . ";
 	translate_1(maimaiCharts[targetDiff]);
 	
 	cout << "\r文件转换成功，正在写入文件. . . ";
+//	while(1) cout << "";
 }

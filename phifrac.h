@@ -1,5 +1,5 @@
 #pragma once
-
+#include <bits/stdc++.h>
 unsigned int getXBitsInFront(unsigned int i,int x){
 	if(x<0) return 0;
 	int bitsInTotal = 0;
@@ -23,7 +23,7 @@ struct phifrac{
 	}
 	phifrac(int _i, int _p, int _q):integer(_i),p(_p),q(_q){
 	}
-	phifrac(int _p, int _q):p(_p),q(_q){
+	phifrac(int _p, int _q):integer(0),p(_p),q(_q){
 	}
 	phifrac(int i):integer(i),p(0),q(1){
 	}
@@ -40,7 +40,7 @@ struct phifrac{
 		}
 		for(q=1;q<=16384;q++)
 			for(p=1;p<q;p++)
-				if(fabs((float)(p)/(float)(q)-fp) <= 1.0e-8) {
+				if(std::fabs((float)(p)/(float)(q)-fp) <= 1.0e-8) {
 					p = sSign * p;
 					return;
 				} 
