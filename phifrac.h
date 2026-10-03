@@ -40,7 +40,7 @@ struct phifrac{
 		}
 		for(q=1;q<=16384;q++)
 			for(p=1;p<q;p++)
-				if(fabs((float)(p)/(float)(q)-fp) <= 1.0e-5) {
+				if(fabs((float)(p)/(float)(q)-fp) <= 1.0e-8) {
 					p = sSign * p;
 					return;
 				} 

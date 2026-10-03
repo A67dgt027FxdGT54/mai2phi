@@ -180,7 +180,7 @@ bool isFloatDigit(char c){
 }
 
 phifrac NoteLenToBeats(float NoteLen){ // o (full note) = 1 NoteLen, = 4 Beats;  quarter note = 4 NoteLen, = 1 beats
-	return 4.0f / NoteLen;
+	return 4 / phifrac(NoteLen);
 }
 phifrac secondsToBeats(float bpm, float seconds){
 	return seconds * bpm / 60.0f;
@@ -272,7 +272,7 @@ void decodeSimai(const string& chart){
 			if(chart[i+1] == '#')
 				commaLen.isSeconds = 1, i++, commaLen.seconds = to_float(getValue(chart, i, '}'));
 			else
-				commaLen.isSeconds = 0, commaLen.beats = phifrac(4.0f / (to_float(getValue(chart, i, '}'))));
+				commaLen.isSeconds = 0, commaLen.beats = NoteLenToBeats(to_float(getValue(chart, i, '}')));
 		}
 		else if('1' <= chart[i] && chart[i] <= '8'){
 			slide_seg_t slideSeg;
@@ -1039,7 +1039,6 @@ int main(){
 	getline(cin,origPath);
 	
 	s = get_file(origPath.c_str());
-	decodeSimai(s);
 	
 	cout << "谱面 ID：";
 	getline(cin,metadata.id);
@@ -1050,7 +1049,10 @@ int main(){
 	cout << "曲绘文件名：";
 	getline(cin,metadata.picture);
 	
-	cout << "文件解析成功。检测到以下难度的谱面。请输入要转换的谱面的编号：\n";
+	cout << "文件解析中. . . ";
+	decodeSimai(s);
+	
+	cout << "\r文件解析成功。检测到以下难度的谱面。请输入要转换的谱面的编号：\n";
 	for(int i=0; i<=6; i++)
 		if(metadata.maimaiCharts[i].is_valid) cout << i << ". " << metadata.maimaiCharts[i].diff << "\n";
 	int targetDiff;
@@ -1064,7 +1066,12 @@ int main(){
 			<< "\nLevel: " << metadata.maimaiCharts[targetDiff].diff <<" Lv." << metadata.maimaiCharts[targetDiff].lv
 			<< "\nComposer: " << metadata.artist
 			<< "\nCharter: "<< metadata.maimaiCharts[targetDiff].charter;
-	for(maimai_note_t g : maimaiCharts[targetDiff].notes ){
-		cout << "Type: " << g.type << " Start: " << g.start << " End: " << g.end << " Key: " << g.segs[0].start.id << "\n";
-	}
+//	for(maimai_note_t g : maimaiCharts[targetDiff].notes ){
+//		cout << "Type: " << g.type << " Start: " << g.start << " End: " << g.end << " Key: " << g.segs[0].start.id << "\n";
+//	}
+	
+	cout << "文件转换中. . . ";
+	translate_1(maimaiCharts[targetDiff]);
+	
+	cout << "\r文件转换成功，正在写入文件. . . ";
 }
