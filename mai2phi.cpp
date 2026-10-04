@@ -5,6 +5,9 @@
 #include <glm/gtc/type_ptr.hpp>
 using namespace std;
 
+std::string Tab(int w){
+	return string(w, ' ');
+}
 void wlog(std::string level,std::string msg){
 	std::ofstream _opengl_log("mai2phi.log",std::ios::app);
     std::time_t now = std::time(nullptr);
@@ -56,14 +59,40 @@ struct metadata_t{
 		{"Master", "13", "Unknown", 0},
 		{"Re:Master", "14", "Unknown", 0}
 	};
+	void outputPhiJSON(ofstream& ofs, int tab, int diff){
+		ofs << Tab(tab) << "\"META\" : {\n"
+		<< Tab(tab+3) << "\"RPEVersion\" : 140,\n" 
+		<< Tab(tab+3) << "\"background\" : \"" << this->picture << "\",\n" 
+		<< Tab(tab+3) << "\"composer\" : \"" << this->artist << "\",\n"
+		<< Tab(tab+3) << "\"charter\" : \"" << this->maimaiCharts[diff].charter << "\",\n"
+		<< Tab(tab+3) << "\"id\" : \"" << this->id << "\",\n"
+		<< Tab(tab+3) << "\"level\" : \"" << this->maimaiCharts[diff].diff << " Lv." << this->maimaiCharts[diff].lv << "\",\n"
+		<< Tab(tab+3) << "\"name\" : \"" << this->songName << "\",\n"
+		<< Tab(tab+3) << "\"offset\" : " << this->maimaiCharts[diff].msOffset << ",\n"
+		<< Tab(tab+3) << "\"song\" : \"" << this->song << "\"\n"
+		<< Tab(tab) << "},\n";
+	}
 }metadata;
 
 struct bpm_t{
 	phifrac start, end;
 	float bpm;
+	void outputPhiJSON(ofstream& ofs, int tab, string end){
+		ofs << Tab(tab) << "{\n"
+		<< Tab(tab+3) << "\"bpm\" : " << fixed << setprecision(2) << bpm << ",\n"
+		<< Tab(tab+3) << "\"startTime\" : "; start.outputPhiJSON(ofs); ofs << "\n" 
+		<< Tab(tab) << "}" << end << "\n";
+	}
 };
 struct bpmlist_t{
 	vector<bpm_t> bpms;
+	void outputPhiJSON(ofstream& ofs, int tab){
+		ofs << Tab(tab) << "\"BPMList\" : [\n";
+		for(int i=0;i<this->bpms.size();i++){
+			bpms[i].outputPhiJSON(ofs, tab+3, (i==this->bpms.size()-1?"":","));
+		}
+		ofs << Tab(tab) << "],\n";
+	}
 };
 struct check_area_t{ // K* for key; else for screen
 	char alpha = 'K';
@@ -516,6 +545,18 @@ struct phigros_control_point_t{
 	phigros_control_point_t() = default;
 	phigros_control_point_t(float aX, float defaultValue):x(aX), value(defaultValue){
 	}
+	void outputPhiJSON(ofstream& ofs, int tab, string end, string pointArgType, int argOrder){
+		ofs << Tab(tab) << "{\n";
+		if(argOrder == 0) 
+			ofs << Tab(tab+3) << "\"" << pointArgType << "\" : " << fixed << setprecision(2) << value << ",\n";
+		ofs << Tab(tab+3) << "\"easing\" : " << easing << ",\n";
+		if(argOrder == 1) 
+			ofs << Tab(tab+3) << "\"" << pointArgType << "\" : " << fixed << setprecision(2) << value << ",\n";
+		ofs << Tab(tab+3) << "\"x\" : " << fixed << setprecision(2) << x << (argOrder == 2 ? ",\n" : "\n");
+		if(argOrder == 2) 
+			ofs << Tab(tab+3) << "\"" << pointArgType << "\" : " << fixed << setprecision(2) << value << "\n";
+		ofs << Tab(tab) << "}" << end << "\n";
+	}
 };
 struct phigros_control_list_t{
 	vector<phigros_control_point_t> points;
@@ -523,24 +564,102 @@ struct phigros_control_list_t{
 		points.push_back(phigros_control_point_t{0.0f, defaultValue});
 		points.push_back(phigros_control_point_t{9999999.0f, defaultValue});
 	}
+	void outputPhiJSON(ofstream& ofs, int tab, string end, string controlType, string pointArgType, int argOrder){
+		ofs << Tab(tab) << "\"" << controlType << "\" : [\n";
+		for(int i = 0; i < this->points.size(); i++){
+			points[i].outputPhiJSON(ofs, tab+3, i==this->points.size()-1?"":",", pointArgType, argOrder); 
+		}
+		ofs << Tab(tab) << "]" << end << "\n";
+	}
 };
-template <typename Argument, int defaultArgument>
+template <typename Argument, int defaultArgument, int IsFloat>
 struct phigros_event_t{
 	int bezier = 0;
 	float bezierPoints[4] = {0.0f, 0.0f, 0.0f, 0.0f};
 	float easingLeft = 0.0f, easingRight = 1.0f;
 	int easingType = 1;
-	Argument start = defaultArgument, end = defaultArgument;
+	Argument start = defaultArgument, end = Argument(defaultArgument);
 	phifrac endTime=2, startTime;
 	int linkgroup = 0;
+	bool isFloat = IsFloat;
+	void outputPhiJSON(ofstream& ofs, int tab, string _end){
+		ofs << Tab(tab) << "{\n"
+		<< Tab(tab+3) << "\"bezier\" : " << this->bezier << ",\n"
+		<< Tab(tab+3) << "\"bezierPoints\" : [ "
+			<< fixed << setprecision(2) << this->bezierPoints[0] << ", " 
+			<< fixed << setprecision(2) << this->bezierPoints[1] << ", " 
+			<< fixed << setprecision(2) << this->bezierPoints[2] << ", " 
+			<< fixed << setprecision(2) << this->bezierPoints[3] << " ],\n"
+		<< Tab(tab+3) << "\"easingLeft\" : " << fixed << setprecision(2) << this->easingLeft << ",\n"
+		<< Tab(tab+3) << "\"easingRight\" : " << fixed << setprecision(2) << this->easingRight << ",\n"
+		<< Tab(tab+3) << "\"easingType\" : " << this->easingType << ",\n"
+		<< Tab(tab+3) << "\"end\" : ";
+			if(isFloat) ofs << fixed << setprecision(2) << this->end;
+			else ofs << this->end;
+			ofs << ",\n"
+		<< Tab(tab+3) << "\"endTime\" : "; this->endTime.outputPhiJSON(ofs); ofs << ",\n"
+		<< Tab(tab+3) << "\"linkgroup\" : " << this->linkgroup << ",\n"
+		<< Tab(tab+3) << "\"start\" : ";
+			if(isFloat) ofs << fixed << setprecision(2) << this->start;
+			else ofs << this->start;
+			ofs << ",\n"
+		<< Tab(tab+3) << "\"startTime\" : "; this->startTime.outputPhiJSON(ofs); ofs << "\n"
+		<< Tab(tab) << "}" << _end << "\n";
+	}
 };
 struct phigros_event_layer_t{
-	vector<phigros_event_t<int, 0> > alphaEvents;
-	vector<phigros_event_t<float, 0> > moveXEvents, moveYEvents, rotateEvents;
-	vector<phigros_event_t<float, 10> > speedEvents;
+	vector<phigros_event_t<int, 0, 0> > alphaEvents;
+	vector<phigros_event_t<float, 0, 1> > moveXEvents, moveYEvents, rotateEvents;
+	vector<phigros_event_t<float, 10, 1> > speedEvents;
+	void outputPhiJSON(ofstream& ofs, int tab, string end){
+		ofs << Tab(tab) << "{\n";
+		
+		ofs << Tab(tab+3) << "\"alphaEvents\" : [\n";
+		for(int i=0; i<this->alphaEvents.size();i++){
+			this->alphaEvents[i].outputPhiJSON(ofs, tab+6, i==this->alphaEvents.size()-1?"":",");
+		}
+		ofs << Tab(tab+3) << "],\n";
+		
+		ofs << Tab(tab+3) << "\"moveXEvents\" : [\n";
+		for(int i=0; i<this->moveXEvents.size();i++){
+			this->moveXEvents[i].outputPhiJSON(ofs, tab+6, i==this->moveXEvents.size()-1?"":",");
+		}
+		ofs << Tab(tab+3) << "],\n";
+		
+		ofs << Tab(tab+3) << "\"moveYEvents\" : [\n";
+		for(int i=0; i<this->moveYEvents.size();i++){
+			this->moveYEvents[i].outputPhiJSON(ofs, tab+6, i==this->moveYEvents.size()-1?"":",");
+		}
+		ofs << Tab(tab+3) << "],\n";
+		
+		ofs << Tab(tab+3) << "\"rotateEvents\" : [\n";
+		for(int i=0; i<this->rotateEvents.size();i++){
+			this->rotateEvents[i].outputPhiJSON(ofs, tab+6, i==this->rotateEvents.size()-1?"":",");
+		}
+		ofs << Tab(tab+3) << "],\n";
+		
+		ofs << Tab(tab+3) << "\"speedEvents\" : [\n";
+		for(int i=0; i<this->speedEvents.size();i++){
+			this->speedEvents[i].outputPhiJSON(ofs, tab+6, i==this->speedEvents.size()-1?"":",");
+		}
+		ofs << Tab(tab+3) << "]\n";
+		
+		ofs << Tab(tab) << "}" << end << "\n";
+	}
 };
 struct phigros_extended_event_layer_t{
-	vector<phigros_event_t<float, 0> > inclineEvents;
+	vector<phigros_event_t<float, 0, 1> > inclineEvents;
+	void outputPhiJSON(ofstream& ofs, int tab, string end){
+		ofs << Tab(tab) << "\"extended\" : {\n";
+		
+		ofs << Tab(tab+3) << "\"inclineEvents\" : [\n";
+		for(int i=0; i<this->inclineEvents.size();i++){
+			this->inclineEvents[i].outputPhiJSON(ofs, tab+6, i==this->inclineEvents.size()-1?"":",");
+		}
+		ofs << Tab(tab+3) << "]\n";
+		
+		ofs << Tab(tab) << "}" << end << "\n";
+	}
 };
 struct phigros_note_t{
 	int above = 1;
@@ -573,15 +692,61 @@ struct phigros_judgeline_t{
 	vector<phigros_event_layer_t> eventLayers;
 	phigros_extended_event_layer_t extended;
 	vector<phigros_note_t> notes;
+	void outputPhiJSON(ofstream& ofs, int tab, string end){
+		ofs << Tab(tab) << "{\n"
+		<< Tab(tab+3) << "\"Group\" : " << this->Group << ",\n" 
+		<< Tab(tab+3) << "\"Name\" : \"" << this->Name << "\",\n"
+		<< Tab(tab+3) << "\"Texture\" : \"" << this->Texture << "\",\n";
+		this->alphaControl.outputPhiJSON(ofs, tab+3, ",", "alphaControl", "alpha", 0);
+		ofs << Tab(tab+3) << "\"bpmfactor\" : " << fixed << setprecision(2) << this->bpmfactor << ",\n";
+		ofs << Tab(tab+3) << "\"eventLayers\" : [\n";
+		for(int i=0;i<this->eventLayers.size();i++){
+			this->eventLayers[i].outputPhiJSON(ofs, tab+6, i==this->eventLayers.size()-1?"":",");
+		}
+		ofs << Tab(tab+3) << "],\n";
+		this->extended.outputPhiJSON(ofs, tab+3, ",");
+		ofs << Tab(tab+3) << "\"father\" : " << this->father << ",\n"
+		<< Tab(tab+3) << "\"isCover\" : " << this->isCover << ",\n";
+		
+		sort(
+			this->notes.begin(), 
+			this->notes.end(), 
+			[](const phigros_note_t& noteA, const phigros_note_t& noteB)->bool{
+				return noteA.startTime < noteB.startTime;
+			}
+		);
+//		todo: this->notes
+		
+		ofs << Tab(tab+3) << "\"numOfNotes\" : " << this->numOfNotes() << ",\n";
+		this->posControl.outputPhiJSON(ofs, tab+3, ",", "posControl", "pos", 1);
+		this->sizeControl.outputPhiJSON(ofs, tab+3, ",", "sizeControl", "size", 1);
+		this->skewControl.outputPhiJSON(ofs, tab+3, ",", "skewControl", "skew", 1);
+		this->yControl.outputPhiJSON(ofs, tab+3, ",", "yControl", "y", 2);
+		ofs << Tab(tab+3) << "\"zOrder\" : " << this->zOrder << "\n";
+		ofs << Tab(tab) << "}" << end << "\n";
+	}
 };
 
 struct phigros_chart_data_t{
-	int RPEVersion = 140;
 	string level = "UK Lv.10"; 
 	vector<string> judgeLineGroup{1,"Default"};
 	vector<phigros_judgeline_t> judgeLineList;
 	string multiLineString = "";
 	float multiScale = 1.0f;
+	void outputPhiJSON(ofstream& ofs, int tab){
+		ofs << Tab(tab) << "\"judgeLineGroup\" : [ ";
+		for(int i=0;i<this->judgeLineGroup.size();i++){
+			ofs << "\"" << this->judgeLineGroup[i] << "\"" << (i==this->judgeLineGroup.size()-1?" ":", ");
+		}
+		ofs << "],\n"
+		<< Tab(tab) << "\"judgeLineList\" : [\n";
+		for(int i = 0; i < this->judgeLineList.size(); i++){
+			this->judgeLineList[i].outputPhiJSON(ofs, tab+3, i==this->judgeLineList.size()-1?"":",");
+		}
+		ofs << Tab(tab) << "],\n"
+		<< Tab(tab) << "\"multiLineString\" : \"" << this->multiLineString << "\",\n"
+		<< Tab(tab) << "\"multiScale\" : " << fixed << setprecision(2) << this->multiScale << "\n"; 
+	}
 }phigrosChart;
 
 // coord: ±675 * ±450
@@ -875,9 +1040,9 @@ void config_1(maimai_chart_data_t& crt){
 		phigros_judgeline_t jl;
 		phigros_event_layer_t el; 
 		
-		phigros_event_t<int, 0> aEvent;
-		phigros_event_t<float, 0> mXEvent, mYEvent, rEvent;
-		phigros_event_t<float, 10> spdEvent;
+		phigros_event_t<int, 0, 0> aEvent;
+		phigros_event_t<float, 0, 1> mXEvent, mYEvent, rEvent;
+		phigros_event_t<float, 10, 1> spdEvent;
 		
 		mXEvent.start = mXEvent.end = mX;
 		mXEvent.startTime = 0;
@@ -1086,5 +1251,15 @@ int main(){
 	translate_1(maimaiCharts[targetDiff]);
 	
 	cout << "\r文件转换成功，正在写入文件. . . ";
+	
+	ofstream ofs(metadata.chart.c_str());
+	ofs << "{\n";
+	maimaiCharts[targetDiff].bpmlist.outputPhiJSON(ofs, 3);
+	metadata.outputPhiJSON(ofs, 3, targetDiff);
+	phigrosChart.outputPhiJSON(ofs, 3);
+	ofs << "}";
+	
+	cout << "\r文件写入完成。转换流程结束        \n";
+	
 //	while(1) cout << "";
 }

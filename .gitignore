@@ -9,3 +9,5 @@ frac.h
 test*.cpp
 
 *.log
+
+*.xlsx
