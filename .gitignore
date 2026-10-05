@@ -11,3 +11,6 @@ test*.cpp
 *.log
 
 *.xlsx
+
+*.mp3
+*.png

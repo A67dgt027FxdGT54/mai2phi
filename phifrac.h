@@ -106,6 +106,10 @@ struct phifrac{
 	phifrac& operator =(const phifrac& o) = default;
 	phifrac(phifrac&& o) = default;
 	phifrac& operator =(phifrac&& o) = default;
+	
+	void outputPhiJSON(std::ofstream& ofs){
+		ofs << "[ " << this->integer << ", " << this->p << ", " << this->q << " ]";
+	}
 };
 
 long long abs(long long x){

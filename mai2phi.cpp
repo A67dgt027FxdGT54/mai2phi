@@ -178,7 +178,8 @@ void decodeFileHeader(const string& chart,int& i, function<void(int)> changeDiff
 								metadata.maimaiCharts[3].msOffset = metadata.maimaiCharts[1].msOffset,
 								metadata.maimaiCharts[4].msOffset = metadata.maimaiCharts[1].msOffset,
 								metadata.maimaiCharts[5].msOffset = metadata.maimaiCharts[1].msOffset,
-								metadata.maimaiCharts[6].msOffset = metadata.maimaiCharts[1].msOffset;
+								metadata.maimaiCharts[6].msOffset = metadata.maimaiCharts[1].msOffset,
+								metadata.maimaiCharts[0].msOffset = metadata.maimaiCharts[1].msOffset;
 	else if(argu == "lv_1")		metadata.maimaiCharts[1].lv = getFileHeaderValue(chart,i); 
 	else if(argu == "lv_2")		metadata.maimaiCharts[2].lv = getFileHeaderValue(chart,i); 
 	else if(argu == "lv_3")		metadata.maimaiCharts[3].lv = getFileHeaderValue(chart,i); 
@@ -190,7 +191,8 @@ void decodeFileHeader(const string& chart,int& i, function<void(int)> changeDiff
 								metadata.maimaiCharts[3].lv = metadata.maimaiCharts[1].lv,
 								metadata.maimaiCharts[4].lv = metadata.maimaiCharts[1].lv,
 								metadata.maimaiCharts[5].lv = metadata.maimaiCharts[1].lv,
-								metadata.maimaiCharts[6].lv = metadata.maimaiCharts[1].lv;
+								metadata.maimaiCharts[6].lv = metadata.maimaiCharts[1].lv,
+								metadata.maimaiCharts[0].lv = metadata.maimaiCharts[1].lv;
 	else if(argu == "des_1")	metadata.maimaiCharts[1].charter = getFileHeaderValue(chart,i); 
 	else if(argu == "des_2")	metadata.maimaiCharts[2].charter = getFileHeaderValue(chart,i); 
 	else if(argu == "des_3")	metadata.maimaiCharts[3].charter = getFileHeaderValue(chart,i); 
@@ -202,7 +204,8 @@ void decodeFileHeader(const string& chart,int& i, function<void(int)> changeDiff
 								metadata.maimaiCharts[3].charter = metadata.maimaiCharts[1].charter,
 								metadata.maimaiCharts[4].charter = metadata.maimaiCharts[1].charter,
 								metadata.maimaiCharts[5].charter = metadata.maimaiCharts[1].charter,
-								metadata.maimaiCharts[6].charter = metadata.maimaiCharts[1].charter;
+								metadata.maimaiCharts[6].charter = metadata.maimaiCharts[1].charter,
+								metadata.maimaiCharts[0].charter = metadata.maimaiCharts[1].charter;
 	else if(argu == "inote_1")	metadata.maimaiCharts[1].is_valid = 1, changeDiffCallback(1);
 	else if(argu == "inote_2")	metadata.maimaiCharts[2].is_valid = 1, changeDiffCallback(2);
 	else if(argu == "inote_3")	metadata.maimaiCharts[3].is_valid = 1, changeDiffCallback(3);
@@ -430,12 +433,12 @@ void decodeSimai(const string& chart){
 		else if(chart[i] == '-' || chart[i] == 'v' || chart[i] == 's' || chart[i] == 'z' || chart[i] == 'w' ||
 			chart[i] == 'p' && chart[i+1] != 'p' || chart[i] == 'q' && chart[i+1] != 'q'){
 			if(lastNote == -1 || i+1 >= chart.length()) continue;
-			addSeg(curDiff, lastNote, chart[i+1] - '0', string(chart[i], 1));
+			addSeg(curDiff, lastNote, chart[i+1] - '0', string(1, chart[i]));
 			i+=1;
 		}
 		else if(i+1 < chart.length() && (chart[i] == 'p' && chart[i+1] == 'p' || chart[i] == 'q' && chart[i+1] == 'q')){
 			if(lastNote == -1 || i+2 >= chart.length()) continue;
-			addSeg(curDiff, lastNote, chart[i+2] - '0', string(chart[i], 2));
+			addSeg(curDiff, lastNote, chart[i+2] - '0', string(1, chart[i]));
 			i+=2;
 		}
 		else if(chart[i] == 'V'){
@@ -458,7 +461,7 @@ void decodeSimai(const string& chart){
 			else if(chart[i] == '^'){
 				int L = (start + 8 - end) % 8;
 				int R = 8 - L;
-				addSeg(curDiff, lastNote, end, string("LR"[int(L > R)], 1));
+				addSeg(curDiff, lastNote, end, string(1, "LR"[int(L > R)]));
 			}
 			i+=1;
 		}
@@ -527,8 +530,8 @@ void decodeSimai(const string& chart){
 			slideSeg.start.id = maimaiCharts[curDiff].notes[lastNote].segs[0].start.id;
 			maimai_note_t note;
 			note.type = 0;
-			note.start = curTime;
-			note.end = curTime;
+			note.start = maimaiCharts[curDiff].notes[lastNote].start;
+			note.end = maimaiCharts[curDiff].notes[lastNote].start;
 			note.segs.push_back(slideSeg);
 			maimaiCharts[curDiff].notes.push_back(note);
 			lastNote = maimaiCharts[curDiff].notes.size() - 1;
@@ -672,6 +675,21 @@ struct phigros_note_t{
 	int type = 1; // 1=T, 2=H, 3=F, 4=D
 	float visibleTime = 999999.0f;
 	float yOffset = 0.0f;
+	void outputPhiJSON(ofstream& ofs, int tab, string end){
+		ofs << Tab(tab) << "{\n"
+		<< Tab(tab+3) << "\"above\" : " << this->above << ",\n"
+		<< Tab(tab+3) << "\"alpha\" : " << this->alpha << ",\n"
+		<< Tab(tab+3) << "\"endTime\" : "; this->endTime.outputPhiJSON(ofs); ofs << ",\n"
+		<< Tab(tab+3) << "\"isFake\" : " << this->isFake << ",\n"
+		<< Tab(tab+3) << "\"positionX\" : " << this->positionX << ",\n"
+		<< Tab(tab+3) << "\"size\" : " << fixed << setprecision(2) << this->size << ",\n"
+		<< Tab(tab+3) << "\"speed\" : " << fixed << setprecision(2) << this->speed << ",\n"
+		<< Tab(tab+3) << "\"startTime\" : "; this->startTime.outputPhiJSON(ofs); ofs << ",\n"
+		<< Tab(tab+3) << "\"type\" : " << this->type << ",\n"
+		<< Tab(tab+3) << "\"visibleTime\" : " << fixed << setprecision(2) << this->visibleTime << ",\n"
+		<< Tab(tab+3) << "\"yOffset\" : " << fixed << setprecision(2) << this->yOffset << "\n"
+		<< Tab(tab) << "}" << end << "\n";
+	}
 };
 struct phigros_judgeline_t{
 	int Group = 0;
@@ -715,7 +733,11 @@ struct phigros_judgeline_t{
 				return noteA.startTime < noteB.startTime;
 			}
 		);
-//		todo: this->notes
+		ofs << Tab(tab+3) << "\"notes\" : [\n";
+		for(int i = 0; i < this->notes.size(); i++){
+			this->notes[i].outputPhiJSON(ofs, tab+6, i==this->notes.size()-1?"":",");
+		} 
+		ofs << Tab(tab+3) << "],\n";
 		
 		ofs << Tab(tab+3) << "\"numOfNotes\" : " << this->numOfNotes() << ",\n";
 		this->posControl.outputPhiJSON(ofs, tab+3, ",", "posControl", "pos", 1);
@@ -775,8 +797,8 @@ float getSlidePQPPQQSegLength(char type, glm::vec2 O, glm::vec2 S, glm::vec2 E, 
 	float eTan = sqrt(eLen * eLen - R * R);
 	float radEAlpha = glm::asin(eTan / eLen);
 	float radEAngle;
-	if(type == 'p') radEAngle = radEGamma + radEAlpha;
-	else if(type == 'q') radEAngle = radEGamma - radEAlpha;
+	if(type == 'q') radEAngle = radEGamma + radEAlpha;
+	else if(type == 'p') radEAngle = radEGamma - radEAlpha;
 	
 	float radAngle;
 	if(type == 'p') radAngle = fmod(radEAngle - radSAngle + glm::radians(360.0f), glm::radians(360.0f));
@@ -846,7 +868,7 @@ float getSlideSegLength(slide_seg_t& ss, slidePQPPQQSegCache_t& cache){
 void addDragSnake(int sid, int eid, int segDrag, phifrac curTime, phifrac stride){
 	phigros_note_t drag;
 	drag.type = 4;
-	drag.speed = 0.0f;
+	drag.speed = 1.0f;
 	for(int i = 0; i < segDrag; i++){
 		drag.startTime = drag.endTime = curTime;
 		drag.positionX = glm::mix(
@@ -858,16 +880,17 @@ void addDragSnake(int sid, int eid, int segDrag, phifrac curTime, phifrac stride
 		curTime += stride;
 	}
 }
-void addDragLine(int totDrag, glm::vec2 S, glm::vec2 E, phifrac curTime, phifrac stride){
+void addDragLine(int totDrag, glm::vec2 S, glm::vec2 E, phifrac curTime, phifrac stride, float visibleTime){
 	phigros_note_t drag;
 	drag.type = 4;
-	drag.speed = 0.0f;
+	drag.speed = 1.0f;
+	drag.visibleTime=visibleTime;
 	for(int i = 0; i < totDrag; i++){
 		float ratio = 1.0f * i / (1.0f * (totDrag-1));
 		drag.startTime = drag.endTime = curTime;
 		drag.positionX = glm::mix(S.x, E.x, ratio);
 		drag.yOffset = 300.0f + glm::mix(S.y, E.y, ratio);
-		phigrosChart.judgeLineList[0].notes.push_back(drag);
+		phigrosChart.judgeLineList[21].notes.push_back(drag);
 		curTime += stride;
 	} 
 }
@@ -876,22 +899,23 @@ int normalizeKeyId(int x){
 	return (x+7)%8+1;
 }
 
-void addNotesForSegPQPPQQC(slidePQPPQQSegCache_t& cache, int totDrag, phifrac curTime, phifrac stride, float R){
+void addNotesForSegPQPPQQC(slidePQPPQQSegCache_t& cache, int totDrag, phifrac curTime, phifrac stride, float R, float visibleTime){
 	phigros_note_t drag;
 	drag.type = 4;
-	drag.speed = 0.0f;
+	drag.speed = 1.0f;
+	drag.visibleTime=visibleTime;
 	for(int i=0; i < totDrag; i++){
 		float ratio = 1.0f * i / (1.0f * (totDrag-1));
 		drag.startTime = drag.endTime = curTime;
 		float radAngle = glm::mix(cache.radSAngle, cache.radEAngle, ratio);
 		drag.positionX = cache.O.x + R * glm::cos(radAngle);
 		drag.yOffset = 300.0f + cache.O.y + R * glm::sin(radAngle);
-		phigrosChart.judgeLineList[0].notes.push_back(drag);
+		phigrosChart.judgeLineList[21].notes.push_back(drag);
 		curTime += stride;
 	}
 	
 }
-void addNotesForSegPQPPQQ(char type, slidePQPPQQSegCache_t& cache, int totDrag, phifrac curTime, phifrac stride, phifrac segTime){
+void addNotesForSegPQPPQQ(char type, slidePQPPQQSegCache_t& cache, int totDrag, phifrac curTime, phifrac stride, phifrac segTime, float visibleTime){
 	const float R = 150.0f;
 	glm::vec2 M1 = cache.O + R * glm::vec2(glm::cos(cache.radSAngle), glm::sin(cache.radSAngle));
 	glm::vec2 M2 = cache.O + R * glm::vec2(glm::cos(cache.radEAngle), glm::sin(cache.radEAngle));
@@ -901,7 +925,7 @@ void addNotesForSegPQPPQQ(char type, slidePQPPQQSegCache_t& cache, int totDrag, 
 	int dC = max(2, (int)(totDrag * ratioC));
 	int dE = max(2, (int)(totDrag - dS - dC)); 
 	stride = segTime / (dS + dC + dE - 1);
-	addDragLine(dS, cache.S, M1, curTime, stride);
+	addDragLine(dS, cache.S, M1, curTime, stride, visibleTime);
 	curTime += stride * dS;
 	if(type == 'p'){
 		if(cache.radEAngle <= cache.radSAngle) cache.radEAngle += glm::radians(360.0f);
@@ -909,16 +933,17 @@ void addNotesForSegPQPPQQ(char type, slidePQPPQQSegCache_t& cache, int totDrag, 
 	else{
 		if(cache.radEAngle >= cache.radSAngle) cache.radSAngle += glm::radians(360.0f);
 	}
-	addNotesForSegPQPPQQC(cache, dC, curTime, stride, R);
+	addNotesForSegPQPPQQC(cache, dC, curTime, stride, R, visibleTime);
 	curTime += stride * dC;
-	addDragLine(dE, M2, cache.E, curTime, stride);
+	addDragLine(dE, M2, cache.E, curTime, stride, visibleTime);
 }
 void addNotesForSeg(slide_seg_t& ss, phifrac curTime, phifrac segTime, slidePQPPQQSegCache_t& cache){
 	phifrac stride;
 	phigros_note_t drag;
 	drag.type = 4;
+	drag.visibleTime = 2;
 	
-	int totDrag = max(2LL,normalize(segTime / phifrac(1, 16)).integer + 1);
+	int totDrag = max(2LL,normalize(segTime / phifrac(1, 8)).integer + 1);
 	stride = segTime / (totDrag-1);
 	
 	if(ss.type == "-"){
@@ -930,7 +955,7 @@ void addNotesForSeg(slide_seg_t& ss, phifrac curTime, phifrac segTime, slidePQPP
 		float s = keyIdToPositionX(sid);
 		float e = keyIdToPositionX(eid);
 		float mid = (s + e) / 2.0f;
-		drag.speed = 0.0f;
+		drag.speed = 1.0f;
 		
 		for(int i = 0; i < totDrag; i++){
 			drag.startTime = drag.endTime = curTime;
@@ -938,7 +963,7 @@ void addNotesForSeg(slide_seg_t& ss, phifrac curTime, phifrac segTime, slidePQPP
 			drag.yOffset = 200.0f * glm::sin(ratio * glm::radians(180.0f));
 			drag.positionX = mid + (mid - e) * glm::cos(ratio * glm::radians(180.0f));
 			if(drag.positionX < -600.0f) drag.positionX += 8 * 150.0f;
-			phigrosChart.judgeLineList[0].notes.push_back(drag);
+			phigrosChart.judgeLineList[21].notes.push_back(drag);
 			curTime += stride; 
 		}
 	}
@@ -948,7 +973,7 @@ void addNotesForSeg(slide_seg_t& ss, phifrac curTime, phifrac segTime, slidePQPP
 		float s = keyIdToPositionX(sid);
 		float e = keyIdToPositionX(eid);
 		float mid = (s + e) / 2.0f;
-		drag.speed = 0.0f;
+		drag.speed = 1.0f;
 		
 		for(int i = 0; i < totDrag; i++){
 			drag.startTime = drag.endTime = curTime;
@@ -956,7 +981,7 @@ void addNotesForSeg(slide_seg_t& ss, phifrac curTime, phifrac segTime, slidePQPP
 			drag.yOffset = 200.0f * glm::sin(ratio * glm::radians(180.0f));
 			drag.positionX = mid + (mid - e) * glm::cos(ratio * glm::radians(180.0f));
 			if(drag.positionX > 600.0f) drag.positionX -= 8 * 150.0f;
-			phigrosChart.judgeLineList[0].notes.push_back(drag);
+			phigrosChart.judgeLineList[21].notes.push_back(drag);
 			curTime += stride;
 		}
 	}
@@ -968,9 +993,9 @@ void addNotesForSeg(slide_seg_t& ss, phifrac curTime, phifrac segTime, slidePQPP
 		int totDrag1 = max(2, int(ratio * totDrag));
 		int totDrag2 = max(2, totDrag - totDrag1);
 		stride = segTime / (totDrag1 + totDrag2 - 1);
-		addDragLine(totDrag1, S, C, curTime, stride); 
+		addDragLine(totDrag1, S, C, curTime, stride, drag.visibleTime); 
 		curTime += stride * totDrag1;
-		addDragLine(totDrag2, C, E, curTime, stride); 
+		addDragLine(totDrag2, C, E, curTime, stride, drag.visibleTime); 
 	}
 	else if(ss.type == "s"){
 		glm::vec2 S = glm::vec2(keyIdToPositionX(ss.start.id), -300.0f); 
@@ -989,11 +1014,11 @@ void addNotesForSeg(slide_seg_t& ss, phifrac curTime, phifrac segTime, slidePQPP
 		int d1 = max(2, int(totDrag * ratio));
 		int d2 = max(2, totDrag - 2 * d1);
 		stride = segTime / (d1 * 2 + d2 - 1);
-		addDragLine(d1, S, M1, curTime, stride);
+		addDragLine(d1, S, M1, curTime, stride, drag.visibleTime);
 		curTime += stride * d1;
-		addDragLine(d2, M1, M2, curTime, stride);
+		addDragLine(d2, M1, M2, curTime, stride, drag.visibleTime);
 		curTime += stride * d2;
-		addDragLine(d1, M2, E, curTime, stride);
+		addDragLine(d1, M2, E, curTime, stride, drag.visibleTime);
 	}
 	else if(ss.type == "z"){
 		glm::vec2 S = glm::vec2(keyIdToPositionX(ss.start.id), -300.0f); 
@@ -1012,11 +1037,11 @@ void addNotesForSeg(slide_seg_t& ss, phifrac curTime, phifrac segTime, slidePQPP
 		int d1 = totDrag * ratio;
 		int d2 = totDrag - 2 * d1;
 		stride = segTime / (d1 * 2 + d2 - 1);
-		addDragLine(d1, S, M1, curTime, stride);
+		addDragLine(d1, S, M1, curTime, stride, drag.visibleTime);
 		curTime += stride * d1;
-		addDragLine(d2, M1, M2, curTime, stride);
+		addDragLine(d2, M1, M2, curTime, stride, drag.visibleTime);
 		curTime += stride * d2;
-		addDragLine(d1, M2, E, curTime, stride);
+		addDragLine(d1, M2, E, curTime, stride, drag.visibleTime);
 	}
 	else if(ss.type == "w"){
 		phifrac curTime1 = curTime, curTime2 = curTime;
@@ -1025,7 +1050,7 @@ void addNotesForSeg(slide_seg_t& ss, phifrac curTime, phifrac segTime, slidePQPP
 		addDragSnake(ss.start.id, normalizeKeyId(ss.end.id+1), totDrag, curTime2, stride);
 	}
 	else if(ss.type == "p" || ss.type == "q" || ss.type == "pp" || ss.type == "qq"){
-		addNotesForSegPQPPQQ(ss.type[0], cache, totDrag, curTime, stride, segTime);
+		addNotesForSegPQPPQQ(ss.type[0], cache, totDrag, curTime, stride, segTime, drag.visibleTime);
 	}
 }
 
@@ -1098,7 +1123,7 @@ void translate_1(maimai_chart_data_t& crt){ // param: maimaiCharts[...]
 				drag.type = 4;
 				drag.positionX = keyIdToPositionX(keyId);
 				if(!mNote.isHold){
-					drag.startTime = drag.endTime = mNote.start;
+					drag.startTime = drag.endTime = mNote.start + phifrac(1, 16);
 					phigrosChart.judgeLineList[0].notes.push_back(drag);
 				}
 				else{
@@ -1147,7 +1172,7 @@ void translate_1(maimai_chart_data_t& crt){ // param: maimaiCharts[...]
 			phigros_note_t drag;
 			drag.type = 4;
 			drag.startTime = drag.endTime = mNote.start;
-			drag.visibleTime = 0.25f;
+			drag.visibleTime = 0.5f;
 			// hori
 			drag.above = 1;
 			drag.positionX = horiLineX;
@@ -1165,9 +1190,9 @@ void translate_1(maimai_chart_data_t& crt){ // param: maimaiCharts[...]
 				hold.type = 2;
 				hold.startTime = mNote.start;
 				hold.endTime = mNote.end;
-				hold.speed = 0.5f;
+//				hold.speed = 0.5f;
 				hold.positionX = horiLineX;
-				hold.visibleTime = 0.25f;
+				hold.visibleTime = 0.5f;
 				phigrosChart.judgeLineList[horiLineId].notes.push_back(hold);
 			}
 		} 
@@ -1252,7 +1277,7 @@ int main(){
 	
 	cout << "\r文件转换成功，正在写入文件. . . ";
 	
-	ofstream ofs(metadata.chart.c_str());
+	ofstream ofs(("output/"+metadata.chart).c_str());
 	ofs << "{\n";
 	maimaiCharts[targetDiff].bpmlist.outputPhiJSON(ofs, 3);
 	metadata.outputPhiJSON(ofs, 3, targetDiff);
