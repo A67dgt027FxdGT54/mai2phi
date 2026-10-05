@@ -1,0 +1,1 @@
+please copy/move your maimai chart file into `mai2phi/*.txt`, and create a folder named `output`.
