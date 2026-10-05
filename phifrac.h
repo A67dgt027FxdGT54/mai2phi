@@ -129,6 +129,7 @@ phifrac normalize(phifrac x){
 	x.q /= g;
 	x.integer += x.p / x.q;
 	x.p = x.p % x.q;
+	while(x.q > 2147483647) x.q = x.q / 2, x.p = x.p / 2;
 	return x;
 }
 phifrac operator +(phifrac x){

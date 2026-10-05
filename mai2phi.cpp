@@ -4,6 +4,7 @@
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
 using namespace std;
+//#define DEBUG
 
 std::string Tab(int w){
 	return string(w, ' ');
@@ -526,7 +527,7 @@ void decodeSimai(const string& chart){
 		else if(chart[i] == '*'){
 			if(lastNote == -1) continue;
 			slide_seg_t slideSeg;
-			slideSeg.start.alpha = 'K';
+			slideSeg.start.alpha = '*';
 			slideSeg.start.id = maimaiCharts[curDiff].notes[lastNote].segs[0].start.id;
 			maimai_note_t note;
 			note.type = 0;
@@ -700,6 +701,8 @@ struct phigros_judgeline_t{
 		return notes.size();
 	}
 	int zOrder = 0;
+	bool canMove = 1;
+	phifrac moveEnd = 0;
 	string Name = "Untitled";
 	string Texture = "line.png";
 	phigros_control_list_t alphaControl{1.0f},
@@ -770,6 +773,8 @@ struct phigros_chart_data_t{
 		<< Tab(tab) << "\"multiScale\" : " << fixed << setprecision(2) << this->multiScale << "\n"; 
 	}
 }phigrosChart;
+
+int maxJudgelineId = 21;
 
 // coord: ±675 * ±450
 
@@ -915,7 +920,10 @@ void addNotesForSegPQPPQQC(slidePQPPQQSegCache_t& cache, int totDrag, phifrac cu
 	}
 	
 }
-void addNotesForSegPQPPQQ(char type, slidePQPPQQSegCache_t& cache, int totDrag, phifrac curTime, phifrac stride, phifrac segTime, float visibleTime){
+void addNotesForSegPQPPQQ(char type, slidePQPPQQSegCache_t& cache, int totDrag, phifrac curTime, phifrac stride, phifrac segTime, float visibleTime, int movingLineId){
+	#ifdef DEBUG
+	cout << "\n$ addNotesForSegPQPPQQ\n";
+	#endif
 	const float R = 150.0f;
 	glm::vec2 M1 = cache.O + R * glm::vec2(glm::cos(cache.radSAngle), glm::sin(cache.radSAngle));
 	glm::vec2 M2 = cache.O + R * glm::vec2(glm::cos(cache.radEAngle), glm::sin(cache.radEAngle));
@@ -925,6 +933,78 @@ void addNotesForSegPQPPQQ(char type, slidePQPPQQSegCache_t& cache, int totDrag, 
 	int dC = max(2, (int)(totDrag * ratioC));
 	int dE = max(2, (int)(totDrag - dS - dC)); 
 	stride = segTime / (dS + dC + dE - 1);
+	
+	phigros_event_t<float, 0, 1> my;
+	my.easingType = 1; // Linear
+	my.start = cache.S.y;
+	my.end = M1.y;
+	my.startTime = curTime;
+	my.endTime = curTime + stride * dS;
+	phigrosChart.judgeLineList[movingLineId].eventLayers[0].moveYEvents.push_back(my);
+	
+	if(glm::sin(cache.radSAngle) < 0.0f){
+		my.easingType = 3; // inSine
+		my.easingLeft = 1.0f + glm::sin(cache.radSAngle);
+		my.start = my.end;
+		my.end = cache.O.y;
+		my.startTime = my.endTime;
+		my.endTime += int(dC * (glm::asin(-glm::sin(cache.radSAngle)) / cache.radAngle)) * stride;
+		phigrosChart.judgeLineList[movingLineId].eventLayers[0].moveYEvents.push_back(my);
+		my.easingLeft = 0.0f;
+		
+		my.easingType = 2; // outSine
+		my.start = my.end;
+		my.end = cache.O.y + R;
+		my.startTime = my.endTime;
+		my.endTime += int(dC * (glm::radians(90.0f) / cache.radAngle)) * stride;
+		phigrosChart.judgeLineList[movingLineId].eventLayers[0].moveYEvents.push_back(my);
+	}
+	else{
+		my.easingType = 2; // outSine
+		my.easingLeft = glm::sin(cache.radSAngle);
+		my.start = my.end;
+		my.end = cache.O.y + R;
+		my.startTime = my.endTime;
+		my.endTime += int(dC * ((glm::radians(90.0f) - glm::asin(glm::sin(cache.radSAngle))) / cache.radAngle)) * stride;
+		phigrosChart.judgeLineList[movingLineId].eventLayers[0].moveYEvents.push_back(my);
+		my.easingLeft = 0.0f;
+	}
+	
+	if(glm::sin(cache.radEAngle) < 0.0f){
+		my.easingType = 3; // inSine
+		my.start = my.end;
+		my.end = cache.O.y;
+		my.startTime = my.endTime;
+		my.endTime += int(dC * (glm::radians(90.0f) / cache.radAngle)) * stride;
+		phigrosChart.judgeLineList[movingLineId].eventLayers[0].moveYEvents.push_back(my);
+		
+		my.easingType = 2; // outSine
+		my.easingRight = -glm::sin(cache.radEAngle);
+		my.start = my.end;
+		my.end = M2.y;
+		my.startTime = my.endTime;
+		my.endTime = curTime + (dS + dC) * stride;
+		phigrosChart.judgeLineList[movingLineId].eventLayers[0].moveYEvents.push_back(my);
+		my.easingRight = 1.0f;
+	}
+	else{
+		my.easingType = 2; // inSine
+		my.easingRight = 1.0f - glm::sin(cache.radEAngle);
+		my.start = my.end;
+		my.end = M2.y;
+		my.startTime = my.endTime;
+		my.endTime = curTime + (dS + dC) * stride;
+		phigrosChart.judgeLineList[movingLineId].eventLayers[0].moveYEvents.push_back(my);
+		my.easingRight = 1.0f;
+	}
+	
+	my.easingType = 1; // Linear
+	my.start = my.end;
+	my.end = cache.E.y;
+	my.startTime = my.endTime;
+	my.endTime = curTime + segTime;
+	phigrosChart.judgeLineList[movingLineId].eventLayers[0].moveYEvents.push_back(my);
+	
 	addDragLine(dS, cache.S, M1, curTime, stride, visibleTime);
 	curTime += stride * dS;
 	if(type == 'p'){
@@ -938,6 +1018,9 @@ void addNotesForSegPQPPQQ(char type, slidePQPPQQSegCache_t& cache, int totDrag, 
 	addDragLine(dE, M2, cache.E, curTime, stride, visibleTime);
 }
 void addNotesForSeg(slide_seg_t& ss, phifrac curTime, phifrac segTime, slidePQPPQQSegCache_t& cache){
+	#ifdef DEBUG
+	cout << "\n$ addNotesForSeg : 1\n";
+	#endif
 	phifrac stride;
 	phigros_note_t drag;
 	drag.type = 4;
@@ -946,102 +1029,9 @@ void addNotesForSeg(slide_seg_t& ss, phifrac curTime, phifrac segTime, slidePQPP
 	int totDrag = max(2LL,normalize(segTime / phifrac(1, 8)).integer + 1);
 	stride = segTime / (totDrag-1);
 	
+	
 	if(ss.type == "-"){
 		addDragSnake(ss.start.id, ss.end.id, totDrag, curTime, stride);
-	}
-	else if(ss.type == "L"){
-		int sid=ss.start.id, eid=ss.end.id;
-		if(sid <= eid) eid -= 8; 
-		float s = keyIdToPositionX(sid);
-		float e = keyIdToPositionX(eid);
-		float mid = (s + e) / 2.0f;
-		drag.speed = 1.0f;
-		
-		for(int i = 0; i < totDrag; i++){
-			drag.startTime = drag.endTime = curTime;
-			float ratio = 1.0f * i / (1.0f * (totDrag-1));
-			drag.yOffset = 200.0f * glm::sin(ratio * glm::radians(180.0f));
-			drag.positionX = mid + (mid - e) * glm::cos(ratio * glm::radians(180.0f));
-			if(drag.positionX < -600.0f) drag.positionX += 8 * 150.0f;
-			phigrosChart.judgeLineList[21].notes.push_back(drag);
-			curTime += stride; 
-		}
-	}
-	else if(ss.type == "R"){
-		int sid=ss.start.id, eid=ss.end.id;
-		if(sid >= eid) eid += 8; 
-		float s = keyIdToPositionX(sid);
-		float e = keyIdToPositionX(eid);
-		float mid = (s + e) / 2.0f;
-		drag.speed = 1.0f;
-		
-		for(int i = 0; i < totDrag; i++){
-			drag.startTime = drag.endTime = curTime;
-			float ratio = 1.0f * i / (1.0f * (totDrag-1));
-			drag.yOffset = 200.0f * glm::sin(ratio * glm::radians(180.0f));
-			drag.positionX = mid + (mid - e) * glm::cos(ratio * glm::radians(180.0f));
-			if(drag.positionX > 600.0f) drag.positionX -= 8 * 150.0f;
-			phigrosChart.judgeLineList[21].notes.push_back(drag);
-			curTime += stride;
-		}
-	}
-	else if(ss.type == "v"){
-		glm::vec2 S = glm::vec2(keyIdToPositionX(ss.start.id), -300.0f); 
-		glm::vec2 E = glm::vec2(keyIdToPositionX(ss.end.id), -300.0f); 
-		glm::vec2 C = glm::vec2(0.0f, 250.0f);
-		float ratio = glm::length(C-S) / (glm::length(E-C) + glm::length(C-S));
-		int totDrag1 = max(2, int(ratio * totDrag));
-		int totDrag2 = max(2, totDrag - totDrag1);
-		stride = segTime / (totDrag1 + totDrag2 - 1);
-		addDragLine(totDrag1, S, C, curTime, stride, drag.visibleTime); 
-		curTime += stride * totDrag1;
-		addDragLine(totDrag2, C, E, curTime, stride, drag.visibleTime); 
-	}
-	else if(ss.type == "s"){
-		glm::vec2 S = glm::vec2(keyIdToPositionX(ss.start.id), -300.0f); 
-		glm::vec2 E = glm::vec2(keyIdToPositionX(ss.end.id), -300.0f); 
-		float mid = (keyIdToPositionX(ss.start.id) + keyIdToPositionX(ss.end.id)) / 2;
-		glm::vec2 M1= glm::vec2(mid, 0.0f);
-		if(ss.start.id < ss.end.id) M1.y = -400.0f;
-		else M1.y = -200.0f;
-		glm::vec2 M2= M1;
-		M2.y = -600.0f - M1.y;
-		
-		float l1 = glm::length(M1 - S);
-		float l2 = 200.0f;
-		float totLength = l1 * 2 + l2;
-		float ratio = l1 / totLength;
-		int d1 = max(2, int(totDrag * ratio));
-		int d2 = max(2, totDrag - 2 * d1);
-		stride = segTime / (d1 * 2 + d2 - 1);
-		addDragLine(d1, S, M1, curTime, stride, drag.visibleTime);
-		curTime += stride * d1;
-		addDragLine(d2, M1, M2, curTime, stride, drag.visibleTime);
-		curTime += stride * d2;
-		addDragLine(d1, M2, E, curTime, stride, drag.visibleTime);
-	}
-	else if(ss.type == "z"){
-		glm::vec2 S = glm::vec2(keyIdToPositionX(ss.start.id), -300.0f); 
-		glm::vec2 E = glm::vec2(keyIdToPositionX(ss.end.id), -300.0f); 
-		float mid = (keyIdToPositionX(ss.start.id) + keyIdToPositionX(ss.end.id)) / 2;
-		glm::vec2 M1= glm::vec2(mid, 0.0f);
-		if(ss.start.id > ss.end.id) M1.y = -400.0f;
-		else M1.y = -200.0f;
-		glm::vec2 M2= M1;
-		M2.y = -600.0f - M1.y;
-		
-		float l1 = glm::length(M1 - S);
-		float l2 = 200.0f;
-		float totLength = l1 * 2 + l2;
-		float ratio = l1 / totLength;
-		int d1 = totDrag * ratio;
-		int d2 = totDrag - 2 * d1;
-		stride = segTime / (d1 * 2 + d2 - 1);
-		addDragLine(d1, S, M1, curTime, stride, drag.visibleTime);
-		curTime += stride * d1;
-		addDragLine(d2, M1, M2, curTime, stride, drag.visibleTime);
-		curTime += stride * d2;
-		addDragLine(d1, M2, E, curTime, stride, drag.visibleTime);
 	}
 	else if(ss.type == "w"){
 		phifrac curTime1 = curTime, curTime2 = curTime;
@@ -1049,8 +1039,215 @@ void addNotesForSeg(slide_seg_t& ss, phifrac curTime, phifrac segTime, slidePQPP
 		addDragSnake(ss.start.id, normalizeKeyId(ss.end.id), totDrag, curTime, stride);
 		addDragSnake(ss.start.id, normalizeKeyId(ss.end.id+1), totDrag, curTime2, stride);
 	}
-	else if(ss.type == "p" || ss.type == "q" || ss.type == "pp" || ss.type == "qq"){
-		addNotesForSegPQPPQQ(ss.type[0], cache, totDrag, curTime, stride, segTime, drag.visibleTime);
+	else {
+		#ifdef DEBUG
+		cout << "\n$ addNotesForSeg : 2\n";
+		#endif
+		int movingLineId = 0;
+		for(int jlid = 22; jlid <= maxJudgelineId; jlid++){
+			if(phigrosChart.judgeLineList[jlid].moveEnd <= curTime){
+				movingLineId = jlid;
+				break;
+			}
+		}
+		#ifdef DEBUG
+		cout << "\n$ addNotesForSeg : 3\n";
+		#endif
+		if(movingLineId == 0){
+			movingLineId = ++maxJudgelineId;
+			phigrosChart.judgeLineList.push_back(phigros_judgeline_t());
+			
+		}
+		#ifdef DEBUG
+		cout << "\n$ addNotesForSeg : 3\n";
+		#endif
+		phigros_event_t<float, 0, 1> my;
+		phigros_event_t<int, 0, 0> alpha;
+		alpha.start = alpha.end = 255;
+		phigrosChart.judgeLineList[movingLineId].eventLayers.resize(1);
+		phigrosChart.judgeLineList[movingLineId].eventLayers[0].alphaEvents.push_back(alpha);
+		phigrosChart.judgeLineList[movingLineId].moveEnd = curTime + segTime;
+		
+		if(ss.type == "L"){
+			int sid=ss.start.id, eid=ss.end.id;
+			if(sid <= eid) eid -= 8; 
+			float s = keyIdToPositionX(sid);
+			float e = keyIdToPositionX(eid);
+			float mid = (s + e) / 2.0f;
+			drag.speed = 1.0f;
+			
+			my.easingType = 2; // OutSine
+			my.start = -300.0f;
+			my.end = -100.0f;
+			my.startTime = curTime;
+			my.endTime = curTime + segTime / 2;
+			phigrosChart.judgeLineList[movingLineId].eventLayers[0].moveYEvents.push_back(my);
+			
+			my.easingType = 3; // inSine
+			my.start = -100.0f;
+			my.end = -300.0f;
+			my.startTime = my.endTime;
+			my.endTime = curTime + segTime;
+			phigrosChart.judgeLineList[movingLineId].eventLayers[0].moveYEvents.push_back(my);
+			
+			for(int i = 0; i < totDrag; i++){
+				drag.startTime = drag.endTime = curTime;
+				float ratio = 1.0f * i / (1.0f * (totDrag-1));
+				drag.yOffset = 200.0f * glm::sin(ratio * glm::radians(180.0f));
+				drag.positionX = mid + (mid - e) * glm::cos(ratio * glm::radians(180.0f));
+				if(drag.positionX < -600.0f) drag.positionX += 8 * 150.0f;
+				phigrosChart.judgeLineList[21].notes.push_back(drag);
+				curTime += stride; 
+			}
+		}
+		else if(ss.type == "R"){
+			int sid=ss.start.id, eid=ss.end.id;
+			if(sid >= eid) eid += 8; 
+			float s = keyIdToPositionX(sid);
+			float e = keyIdToPositionX(eid);
+			float mid = (s + e) / 2.0f;
+			drag.speed = 1.0f;
+			
+			my.easingType = 2; // OutSine
+			my.start = -300.0f;
+			my.end = -100.0f;
+			my.startTime = curTime;
+			my.endTime = curTime + segTime / 2;
+			phigrosChart.judgeLineList[movingLineId].eventLayers[0].moveYEvents.push_back(my);
+			
+			my.easingType = 3; // inSine
+			my.start = -100.0f;
+			my.end = -300.0f;
+			my.startTime = my.endTime;
+			my.endTime = curTime + segTime;
+			phigrosChart.judgeLineList[movingLineId].eventLayers[0].moveYEvents.push_back(my);
+			
+			for(int i = 0; i < totDrag; i++){
+				drag.startTime = drag.endTime = curTime;
+				float ratio = 1.0f * i / (1.0f * (totDrag-1));
+				drag.yOffset = 200.0f * glm::sin(ratio * glm::radians(180.0f));
+				drag.positionX = mid + (mid - e) * glm::cos(ratio * glm::radians(180.0f));
+				if(drag.positionX > 600.0f) drag.positionX -= 8 * 150.0f;
+				phigrosChart.judgeLineList[21].notes.push_back(drag);
+				curTime += stride;
+			}
+		}
+		else if(ss.type == "v"){
+			glm::vec2 S = glm::vec2(keyIdToPositionX(ss.start.id), -300.0f); 
+			glm::vec2 E = glm::vec2(keyIdToPositionX(ss.end.id), -300.0f); 
+			glm::vec2 C = glm::vec2(0.0f, 250.0f);
+			float ratio = glm::length(C-S) / (glm::length(E-C) + glm::length(C-S));
+			
+			int totDrag1 = max(2, int(ratio * totDrag));
+			int totDrag2 = max(2, totDrag - totDrag1);
+			stride = segTime / (totDrag1 + totDrag2 - 1);
+			
+			my.easingType = 1; // Linear
+			my.start = -300.0f;
+			my.end = 250.0f;
+			my.startTime = curTime;
+			my.endTime = curTime + stride * totDrag1;
+			phigrosChart.judgeLineList[movingLineId].eventLayers[0].moveYEvents.push_back(my);
+			
+			my.start = 250.0f;
+			my.end = -300.0f;
+			my.startTime = my.endTime;
+			my.endTime = curTime + segTime;
+			phigrosChart.judgeLineList[movingLineId].eventLayers[0].moveYEvents.push_back(my);
+			
+			addDragLine(totDrag1, S, C, curTime, stride, drag.visibleTime); 
+			curTime += stride * totDrag1;
+			addDragLine(totDrag2, C, E, curTime, stride, drag.visibleTime); 
+		}
+		else if(ss.type == "s"){
+			glm::vec2 S = glm::vec2(keyIdToPositionX(ss.start.id), -300.0f); 
+			glm::vec2 E = glm::vec2(keyIdToPositionX(ss.end.id), -300.0f); 
+			float mid = (keyIdToPositionX(ss.start.id) + keyIdToPositionX(ss.end.id)) / 2;
+			glm::vec2 M1= glm::vec2(mid, 0.0f);
+			if(ss.start.id < ss.end.id) M1.y = -400.0f;
+			else M1.y = -200.0f;
+			glm::vec2 M2= M1;
+			M2.y = -600.0f - M1.y;
+			
+			float l1 = glm::length(M1 - S);
+			float l2 = 200.0f;
+			float totLength = l1 * 2 + l2;
+			float ratio = l1 / totLength;
+			int d1 = max(2, int(totDrag * ratio));
+			int d2 = max(2, totDrag - 2 * d1);
+			stride = segTime / (d1 * 2 + d2 - 1);
+			
+			my.easingType = 1; // Linear
+			my.start = -300.0f;
+			my.end = M1.y;
+			my.startTime = curTime;
+			my.endTime = curTime + stride * d1;
+			phigrosChart.judgeLineList[movingLineId].eventLayers[0].moveYEvents.push_back(my);
+			
+			my.start = my.end;
+			my.end = M2.y;
+			my.startTime = my.endTime;
+			my.endTime += stride * d2;
+			phigrosChart.judgeLineList[movingLineId].eventLayers[0].moveYEvents.push_back(my);
+			
+			my.start = my.end;
+			my.end = -300.0f;
+			my.startTime = my.endTime;
+			my.endTime = curTime + segTime;
+			phigrosChart.judgeLineList[movingLineId].eventLayers[0].moveYEvents.push_back(my);
+			
+			addDragLine(d1, S, M1, curTime, stride, drag.visibleTime);
+			curTime += stride * d1;
+			addDragLine(d2, M1, M2, curTime, stride, drag.visibleTime);
+			curTime += stride * d2;
+			addDragLine(d1, M2, E, curTime, stride, drag.visibleTime);
+		}
+		else if(ss.type == "z"){
+			glm::vec2 S = glm::vec2(keyIdToPositionX(ss.start.id), -300.0f); 
+			glm::vec2 E = glm::vec2(keyIdToPositionX(ss.end.id), -300.0f); 
+			float mid = (keyIdToPositionX(ss.start.id) + keyIdToPositionX(ss.end.id)) / 2;
+			glm::vec2 M1= glm::vec2(mid, 0.0f);
+			if(ss.start.id > ss.end.id) M1.y = -400.0f;
+			else M1.y = -200.0f;
+			glm::vec2 M2= M1;
+			M2.y = -600.0f - M1.y;
+			
+			float l1 = glm::length(M1 - S);
+			float l2 = 200.0f;
+			float totLength = l1 * 2 + l2;
+			float ratio = l1 / totLength;
+			int d1 = totDrag * ratio;
+			int d2 = totDrag - 2 * d1;
+			stride = segTime / (d1 * 2 + d2 - 1);
+			
+			my.easingType = 1; // Linear
+			my.start = -300.0f;
+			my.end = M1.y;
+			my.startTime = curTime;
+			my.endTime = curTime + stride * d1;
+			phigrosChart.judgeLineList[movingLineId].eventLayers[0].moveYEvents.push_back(my);
+			
+			my.start = my.end;
+			my.end = M2.y;
+			my.startTime = my.endTime;
+			my.endTime += stride * d2;
+			phigrosChart.judgeLineList[movingLineId].eventLayers[0].moveYEvents.push_back(my);
+			
+			my.start = my.end;
+			my.end = -300.0f;
+			my.startTime = my.endTime;
+			my.endTime = curTime + segTime;
+			phigrosChart.judgeLineList[movingLineId].eventLayers[0].moveYEvents.push_back(my);
+			
+			addDragLine(d1, S, M1, curTime, stride, drag.visibleTime);
+			curTime += stride * d1;
+			addDragLine(d2, M1, M2, curTime, stride, drag.visibleTime);
+			curTime += stride * d2;
+			addDragLine(d1, M2, E, curTime, stride, drag.visibleTime);
+		}
+		else if(ss.type == "p" || ss.type == "q" || ss.type == "pp" || ss.type == "qq"){
+			addNotesForSegPQPPQQ(ss.type[0], cache, totDrag, curTime, stride, segTime, drag.visibleTime, movingLineId);
+		}
 	}
 }
 
@@ -1097,6 +1294,7 @@ void config_1(maimai_chart_data_t& crt){
 		}
 		
 		jl.eventLayers.push_back(el);
+		jl.canMove = 0;
 		phigrosChart.judgeLineList.push_back(jl);
 	}
 }
@@ -1200,15 +1398,17 @@ void translate_1(maimai_chart_data_t& crt){ // param: maimaiCharts[...]
 			
 			// ----------------------
 			//  star in maimai -> tap
-			phigros_note_t tap;
-			tap.type = 1;
-			tap.startTime = tap.endTime = mNote.start;
-			tap.positionX = keyIdToPositionX(mNote.segs[0].start.id);
-			phigrosChart.judgeLineList[0].notes.push_back(tap);
+			if(mNote.segs[0].start.alpha != '*'){
+				phigros_note_t tap;
+				tap.type = 1;
+				tap.startTime = tap.endTime = mNote.start;
+				tap.positionX = keyIdToPositionX(mNote.segs[0].start.id);
+				phigrosChart.judgeLineList[0].notes.push_back(tap);
+			}
 			
 			// ----------------------
 			//  calc for ratio
-			slide_seg_t ss;
+//			slide_seg_t ss;
 			float totLength = 0.0f;
 			phifrac totTime = mNote.end - mNote.start - mNote.slideDelta;
 			vector<float> lengthCache;
@@ -1268,9 +1468,9 @@ int main(){
 			<< "\nLevel: " << metadata.maimaiCharts[targetDiff].diff <<" Lv." << metadata.maimaiCharts[targetDiff].lv
 			<< "\nComposer: " << metadata.artist
 			<< "\nCharter: "<< metadata.maimaiCharts[targetDiff].charter;
-	for(maimai_note_t g : maimaiCharts[targetDiff].notes ){
-		cout << "Type: " << g.type << " Start: " << g.start << " End: " << g.end << " Key: " << g.segs[0].start.alpha << g.segs[0].start.id << "\n";
-	}
+//	for(maimai_note_t g : maimaiCharts[targetDiff].notes ){
+//		cout << "Type: " << g.type << " Start: " << g.start << " End: " << g.end << " Key: " << g.segs[0].start.alpha << g.segs[0].start.id << "\n";
+//	}
 	
 	cout << "文件转换中. . . ";
 	translate_1(maimaiCharts[targetDiff]);
